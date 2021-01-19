@@ -1,0 +1,29 @@
+# standard variables
+prefix=/media/data/home/rp/code/EPICS/base-3.16.1
+exec_prefix=${prefix}
+bindir=${prefix}/bin/linux-arm
+libdir=${prefix}/lib/linux-arm
+
+# non-standard variables
+
+# EPICS Base install location
+FINAL_LOCATION=${prefix}
+ARCH=linux-arm
+OS_CLASS=Linux
+CMPLR_CLASS=gcc
+
+# Directories
+
+includedir_osi=${prefix}/include
+includedir_osd=${prefix}/include/os/Linux
+includedir_comp=${prefix}/include/compiler/gcc
+
+includedirs=${includedir_osi} ${includedir_osd} ${includedir_comp}
+
+dbddir=${prefix}/dbd
+dbdir=${prefix}/db
+
+Name: epics-base
+Version: 3.16.1.0
+Description: EPICS Base for the host arch
+Requires: epics-base-linux-arm = 3.16.1.0
