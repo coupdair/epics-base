@@ -115,11 +115,18 @@ epicsShareFunc unsigned epicsShareAPI ipAddrToHostName
 epicsShareFunc int epicsShareAPI
 hostToIPAddr(const char *pHostName, struct in_addr *pIPA)
 {
-    int addr = hostGetByName ( (char *) pHostName );
-    if ( addr == ERROR ) {
+    int addr;
+
+    addr = hostGetByName((char *)pHostName);
+    if (addr != ERROR) {
+        pIPA->s_addr = (unsigned long) addr;
+    }
+    else if (inet_aton((char *)pHostName, pIPA) == ERROR) {
+        /*
+         * return indicating an error
+         */
         return -1;
     }
-    pIPA->s_addr = (unsigned long) addr;
 
     /*
      * success

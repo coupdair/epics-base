@@ -7,6 +7,7 @@
 * and higher are distributed subject to a Software License Agreement found
 * in file LICENSE that is included with this distribution. 
 \*************************************************************************/
+/* Revision-Id: anj@aps.anl.gov-20101005192737-disfz3vs0f3fiixd */
 
 /* Author:  Marty Kraimer Date:    04JAN99 */
 
@@ -18,7 +19,6 @@
 #include "errlog.h"
 #include "cantProceed.h"
 #include "epicsThread.h"
-#include "epicsStackTrace.h"
 
 epicsShareFunc void * callocMustSucceed(size_t count, size_t size, const char *msg)
 {
@@ -62,9 +62,6 @@ epicsShareFunc void cantProceed(const char *msg, ...)
     
     errlogPrintf("Thread %s (%p) can't proceed, suspending.\n",
             epicsThreadGetNameSelf(), (void *)epicsThreadGetIdSelf());
-
-    epicsStackTrace();
-
     errlogFlush();
     
     epicsThreadSleep(1.0);

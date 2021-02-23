@@ -5,6 +5,5 @@
 
 # Set GNU_DIR to point to directory containing the tool-chain
 
-# APS:
-GNU_DIR = /usr/local/vw/xscale_be
+GNU_DIR = /usr/local/xscale_be
 

@@ -42,7 +42,8 @@ epicsShareDef struct dbBase **iocshPpdbbase;
  * File-local information
  */
 struct iocshCommand {
-    iocshCmdDef            def;
+    iocshFuncDef const    *pFuncDef;
+    iocshCallFunc          func;
     struct iocshCommand   *next;
 };
 static struct iocshCommand *iocshCommandHead;
@@ -55,8 +56,7 @@ static struct iocshVariable *iocshVariableHead;
 static char iocshVarID[] = "iocshVar";
 extern "C" { static void varCallFunc(const iocshArgBuf *); }
 static epicsMutexId iocshTableMutex;
-static epicsThreadOnceId iocshOnceId = EPICS_THREAD_ONCE_INIT;
-static epicsThreadPrivateId iocshMacroHandleId;
+static epicsThreadOnceId iocshTableOnceId = EPICS_THREAD_ONCE_INIT;
 
 /*
  * I/O redirection
@@ -71,17 +71,11 @@ struct iocshRedirect {
 };
 
 /*
- * Set up module variables
+ * Set up command table mutex
  */
-static void iocshOnce (void *)
+static void iocshTableOnce (void *)
 {
     iocshTableMutex = epicsMutexMustCreate ();
-    iocshMacroHandleId = epicsThreadPrivateCreate();
-}
-
-static void iocshInit (void)
-{
-    epicsThreadOnce (&iocshOnceId, iocshOnce, NULL);
 }
 
 /*
@@ -90,7 +84,7 @@ static void iocshInit (void)
 static void
 iocshTableLock (void)
 {
-    iocshInit();
+    epicsThreadOnce (&iocshTableOnceId, iocshTableOnce, NULL);
     epicsMutexMustLock (iocshTableMutex);
 }
 
@@ -100,6 +94,7 @@ iocshTableLock (void)
 static void
 iocshTableUnlock (void)
 {
+    epicsThreadOnce (&iocshTableOnceId, iocshTableOnce, NULL);
     epicsMutexUnlock (iocshTableMutex);
 }
 
@@ -114,10 +109,10 @@ void epicsShareAPI iocshRegister (const iocshFuncDef *piocshFuncDef,
 
     iocshTableLock ();
     for (l = NULL, p = iocshCommandHead ; p != NULL ; l = p, p = p->next) {
-        i = strcmp (piocshFuncDef->name, p->def.pFuncDef->name);
+        i = strcmp (piocshFuncDef->name, p->pFuncDef->name);
         if (i == 0) {
-            p->def.pFuncDef = piocshFuncDef;
-            p->def.func = func;
+            p->pFuncDef = piocshFuncDef;
+            p->func = func;
             iocshTableUnlock ();
             return;
         }
@@ -140,18 +135,9 @@ void epicsShareAPI iocshRegister (const iocshFuncDef *piocshFuncDef,
         n->next = l->next;
         l->next = n;
     }
-    n->def.pFuncDef = piocshFuncDef;
-    n->def.func = func;
+    n->pFuncDef = piocshFuncDef;
+    n->func = func;
     iocshTableUnlock ();
-}
-
-
-/*
- * Retrieves a previously registered function with the given name.
- */
-const iocshCmdDef * epicsShareAPI iocshFindCommand(const char *name)
-{
-    return (iocshCmdDef *) registryFind(iocshCmdID, name);
 }
 
 /*
@@ -213,35 +199,24 @@ void epicsShareAPI iocshRegisterVariable (const iocshVarDef *piocshVarDef)
 }
 
 /*
- * Retrieves a previously registered variable with the given name.
- */
-const iocshVarDef * epicsShareAPI iocshFindVariable(const char *name)
-{
-    struct iocshVariable *temp = (iocshVariable *) registryFind(iocshVarID, name);
-    return temp->pVarDef; 
-}
-
-/*
  * Free storage created by iocshRegister/iocshRegisterVariable
  */
 void epicsShareAPI iocshFree(void) 
 {
-    struct iocshCommand *pc;
-    struct iocshVariable *pv;
+    struct iocshCommand *pc, *nc;
+    struct iocshVariable *pv, *nv;
 
     iocshTableLock ();
     for (pc = iocshCommandHead ; pc != NULL ; ) {
-        struct iocshCommand * nc = pc->next;
+        nc = pc->next;
         free (pc);
         pc = nc;
     }
     for (pv = iocshVariableHead ; pv != NULL ; ) {
-        struct iocshVariable *nv = pv->next;
+        nv = pv->next;
         free (pv);
         pv = nv;
     }
-    iocshCommandHead = NULL;
-    iocshVariableHead = NULL;
     iocshTableUnlock ();
 }
 
@@ -309,12 +284,11 @@ cvtArg (const char *filename, int lineno, char *arg, iocshArgBuf *argBuf,
         break;
 
     case iocshArgPersistentString:
-        argBuf->sval = (char *) malloc(strlen(arg) + 1);
+        argBuf->sval = epicsStrDup(arg);
         if (argBuf->sval == NULL) {
             showError(filename, lineno, "Out of memory");
             return 0;
         }
-        strcpy(argBuf->sval, arg);
         break;
 
     case iocshArgPdbbase:
@@ -448,7 +422,7 @@ static void helpCallFunc(const iocshArgBuf *args)
             "Type 'help <command>' to see the arguments of <command>.\n");
         iocshTableLock ();
         for (pcmd = iocshCommandHead ; pcmd != NULL ; pcmd = pcmd->next) {
-            piocshFuncDef = pcmd->def.pFuncDef;
+            piocshFuncDef = pcmd->pFuncDef;
             l = strlen (piocshFuncDef->name);
             if ((l + col) >= 79) {
                 fputc('\n', epicsGetStdout());
@@ -474,7 +448,7 @@ static void helpCallFunc(const iocshArgBuf *args)
     else {
         for (int iarg = 1 ; iarg < argc ; iarg++) {
             for (pcmd = iocshCommandHead ; pcmd != NULL ; pcmd = pcmd->next) {
-                piocshFuncDef = pcmd->def.pFuncDef;
+                piocshFuncDef = pcmd->pFuncDef;
                 if (epicsStrGlobMatch(piocshFuncDef->name, argv[iarg]) != 0) {
                     fputs(piocshFuncDef->name, epicsGetStdout());
                     for (int a = 0 ; a < piocshFuncDef->nargs ; a++) {
@@ -498,7 +472,7 @@ static void helpCallFunc(const iocshArgBuf *args)
  * The body of the command interpreter
  */
 static int
-iocshBody (const char *pathname, const char *commandLine, const char *macros)
+iocshBody (const char *pathname, const char *commandLine)
 {
     FILE *fp = NULL;
     const char *filename = NULL;
@@ -521,12 +495,7 @@ iocshBody (const char *pathname, const char *commandLine, const char *macros)
     struct iocshCommand *found;
     void *readlineContext = NULL;
     int wasOkToBlock;
-    static const char * pairs[] = {"", "environ", NULL, NULL};
-    MAC_HANDLE *handle;
-    char ** defines = NULL;
     
-    iocshInit();
-
     /*
      * See if command interpreter is interactive
      */
@@ -568,37 +537,7 @@ iocshBody (const char *pathname, const char *commandLine, const char *macros)
         fprintf(epicsGetStderr(), "Out of memory!\n");
         return -1;
     }
-    
-    /*
-     * Parse macro definitions, this check occurs before creating the
-     * macro handle to simplify cleanup.
-     */
-    
-    if (macros) {
-        if (macParseDefns(NULL, macros, &defines) < 0) {
-            free(redirects);
-            return -1;
-        }
-    }
-    
-    /*
-     * Check for existing macro context or construct a new one.
-     */
-    handle = (MAC_HANDLE *) epicsThreadPrivateGet(iocshMacroHandleId);
-    
-    if (handle == NULL) {
-        if (macCreateHandle(&handle, pairs)) {
-            errlogMessage("iocsh: macCreateHandle failed.");
-            free(redirects);
-            return -1;
-        }
-        
-        epicsThreadPrivateSet(iocshMacroHandleId, (void *) handle);
-    }
-    
-    macPushScope(handle);
-    macInstallMacros(handle, defines);
-    
+
     /*
      * Read commands till EOF or exit
      */
@@ -630,13 +569,12 @@ iocshBody (const char *pathname, const char *commandLine, const char *macros)
 
         /*
          * Ignore comment lines other than to echo
-         * them if they came from a script (disable echoing
-         * with '#-').  This avoids macLib errors from comments.
+         * them if they came from a script.  This
+         * avoids macLib errors from comments.
          */
         if (c == '#') {
             if ((prompt == NULL) && (commandLine == NULL))
-                if (raw[icin + 1] != '-')
-                    puts(raw);
+                puts(raw);
             continue;
         }
 
@@ -644,7 +582,7 @@ iocshBody (const char *pathname, const char *commandLine, const char *macros)
          * Expand macros
          */
         free(line);
-        if ((line = macDefExpand(raw, handle)) == NULL)
+        if ((line = macEnvExpand(raw)) == NULL)
             continue;
 
         /*
@@ -655,12 +593,10 @@ iocshBody (const char *pathname, const char *commandLine, const char *macros)
         }
 
         /*
-         * Echo non-empty lines read from a script.
-         * Comments delineated with '#-' aren't echoed.
+         * Echo non-empty lines read from a script
          */
         if ((prompt == NULL) && *line && (commandLine == NULL))
-            if ((c != '#') || (line[icin + 1] != '-'))
-                puts(line);
+            puts(line);
 
         /*
          * Ignore lines that became a comment or empty after macro expansion
@@ -805,7 +741,7 @@ iocshBody (const char *pathname, const char *commandLine, const char *macros)
             if (openRedirect(filename, lineno, redirects) < 0)
                 continue;
             startRedirect(filename, lineno, redirects);
-            iocshBody(commandFile, NULL, macros);
+            iocshBody(commandFile, NULL);
             stopRedirect(filename, lineno, redirects);
             continue;
         }
@@ -828,11 +764,11 @@ iocshBody (const char *pathname, const char *commandLine, const char *macros)
                 /*
                  * Process arguments and call function
                  */
-                struct iocshFuncDef const *piocshFuncDef = found->def.pFuncDef;
+                struct iocshFuncDef const *piocshFuncDef = found->pFuncDef;
                 for (int iarg = 0 ; ; ) {
                     if (iarg == piocshFuncDef->nargs) {
                         startRedirect(filename, lineno, redirects);
-                        (*found->def.func)(argBuf);
+                        (*found->func)(argBuf);
                         break;
                     }
                     if (iarg >= argBufCapacity) {
@@ -872,12 +808,6 @@ iocshBody (const char *pathname, const char *commandLine, const char *macros)
         }
         stopRedirect(filename, lineno, redirects);
     }
-    macPopScope(handle);
-    
-    if (handle->level == 0) {
-        macDeleteHandle(handle);
-        epicsThreadPrivateSet(iocshMacroHandleId, NULL);
-    }
     if (fp && (fp != stdin))
         fclose (fp);
     if (redirects != NULL) {
@@ -900,58 +830,17 @@ iocshBody (const char *pathname, const char *commandLine, const char *macros)
 int epicsShareAPI
 iocsh (const char *pathname)
 {
-    return iocshLoad(pathname, NULL);
+    if (pathname)
+        epicsEnvSet("IOCSH_STARTUP_SCRIPT", pathname);
+    return iocshBody(pathname, NULL);
 }
 
 int epicsShareAPI
 iocshCmd (const char *cmd)
 {
-    return iocshRun(cmd, NULL);
-}
-
-int epicsShareAPI
-iocshLoad(const char *pathname, const char *macros)
-{
-    if (pathname)
-        epicsEnvSet("IOCSH_STARTUP_SCRIPT", pathname);
-    return iocshBody(pathname, NULL, macros);
-}
-
-int epicsShareAPI
-iocshRun(const char *cmd, const char *macros)
-{
     if (cmd == NULL)
         return 0;
-    return iocshBody(NULL, cmd, macros);
-}
-
-/*
- * Needed to work around the necessary limitations of macLib and
- * environment variables. In every other case of macro expansion
- * it is the expected outcome that defined macros override any
- * environment variables. 
- *
- * iocshLoad/Run turn this on its head as it is very likely that 
- * an epicsEnvSet command may be run within the context of their 
- * calls. Thus, it would be expected that the new value would be 
- * returned in any future macro expansion.
- *
- * To do so, the epicsEnvSet command needs to be able to access
- * and update the shared MAC_HANDLE that the iocsh uses. Which is
- * what this function is provided for.
- */
-void epicsShareAPI
-iocshEnvClear(const char *name)
-{
-    MAC_HANDLE *handle;
-    
-    if (iocshMacroHandleId) {
-        handle = (MAC_HANDLE *) epicsThreadPrivateGet(iocshMacroHandleId);
-    
-        if (handle != NULL) {
-            macPutValue(handle, name, NULL);
-        }
-    }
+    return iocshBody(NULL, cmd);
 }
 
 /*
@@ -1034,26 +923,6 @@ static void iocshCmdCallFunc(const iocshArgBuf *args)
     iocshCmd(args[0].sval);
 }
 
-/* iocshLoad */
-static const iocshArg iocshLoadArg0 = { "pathname",iocshArgString};
-static const iocshArg iocshLoadArg1 = { "macros", iocshArgString};
-static const iocshArg *iocshLoadArgs[2] = {&iocshLoadArg0, &iocshLoadArg1};
-static const iocshFuncDef iocshLoadFuncDef = {"iocshLoad",2,iocshLoadArgs};
-static void iocshLoadCallFunc(const iocshArgBuf *args)
-{
-    iocshLoad(args[0].sval, args[1].sval);
-}
-
-/* iocshRun */
-static const iocshArg iocshRunArg0 = { "command",iocshArgString};
-static const iocshArg iocshRunArg1 = { "macros", iocshArgString};
-static const iocshArg *iocshRunArgs[2] = {&iocshRunArg0, &iocshRunArg1};
-static const iocshFuncDef iocshRunFuncDef = {"iocshRun",2,iocshRunArgs};
-static void iocshRunCallFunc(const iocshArgBuf *args)
-{
-    iocshRun(args[0].sval, args[1].sval);
-}
-
 /*
  * Dummy internal commands -- register and install in command table
  * so they show up in the help display
@@ -1081,8 +950,6 @@ static void localRegister (void)
     iocshRegister(&exitFuncDef,exitCallFunc);
     iocshRegister(&helpFuncDef,helpCallFunc);
     iocshRegister(&iocshCmdFuncDef,iocshCmdCallFunc);
-    iocshRegister(&iocshLoadFuncDef,iocshLoadCallFunc);
-    iocshRegister(&iocshRunFuncDef,iocshRunCallFunc);
 }
 
 } /* extern "C" */

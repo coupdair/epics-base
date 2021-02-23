@@ -9,6 +9,8 @@
 \*************************************************************************/
 
 /*
+ * Revision-Id: anj@aps.anl.gov-20101005192737-disfz3vs0f3fiixd
+ *
  * Author: Jeff Hill
  */
 
@@ -17,12 +19,12 @@
 
 #include <unistd.h>
 
-#if !defined(_POSIX_TIMERS) || _POSIX_TIMERS < 0
+#ifndef _POSIX_TIMERS
 	struct timespec {
 		time_t tv_sec; /* seconds since some epoch */
 		long tv_nsec; /* nanoseconds within the second */
 	};
-#endif /* !_POSIX_TIMERS */
+#endif /* ifndef _POSIX_TIMERS */
 
 #ifdef __cplusplus
 extern "C" {

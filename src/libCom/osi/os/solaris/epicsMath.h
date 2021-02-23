@@ -17,10 +17,6 @@
 /* same as (!isnan(x) && !finite(x)) */
 #endif
 
-#ifndef isnan
-#  define isnan(x) ((x) != (x))
-#endif
-
 #ifdef __cplusplus
 extern "C" {
 #endif

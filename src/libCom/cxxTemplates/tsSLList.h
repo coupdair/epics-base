@@ -8,6 +8,8 @@
 * in file LICENSE that is included with this distribution. 
 \*************************************************************************/
 /*
+ *      Revision-Id: anj@aps.anl.gov-20101005192737-disfz3vs0f3fiixd
+ *
  *      type safe singly linked list templates
  *
  *      Author  Jeffrey O. Hill
@@ -38,7 +40,7 @@ template <class T>
 class tsSLNode {
 public:
     tsSLNode ();
-    tsSLNode < T > & operator = ( const tsSLNode < T > & );
+    tsSLNode < T > & operator = ( const tsSLNode < T > & ) const;
 private:
     void removeNextItem (); // removes the item after this node
     T *pNext;
@@ -146,7 +148,7 @@ inline tsSLNode < T > :: tsSLNode ( const tsSLNode < T > & )
 //
 template < class T >
 inline tsSLNode < T > &  tsSLNode < T >::operator = 
-    ( const tsSLNode < T > & )
+    ( const tsSLNode < T > & ) const 
 {
     return *this;
 }

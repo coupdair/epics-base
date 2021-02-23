@@ -16,22 +16,18 @@
 #ifndef DBMF_H
 #define DBMF_H
 
-#include <stdlib.h>
 #include "shareLib.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-epicsShareFunc int dbmfInit(size_t size, int chunkItems);
-epicsShareFunc void * dbmfMalloc(size_t bytes);
-epicsShareFunc char * dbmfStrdup(const char *str);
-epicsShareFunc char * dbmfStrndup(const char *str, size_t len);
-epicsShareFunc char * dbmfStrcat3(const char *lhs, const char *mid,
-    const char *rhs);
-epicsShareFunc void dbmfFree(void *bytes);
-epicsShareFunc void dbmfFreeChunks(void);
-epicsShareFunc int dbmfShow(int level);
+epicsShareFunc int epicsShareAPI dbmfInit(size_t size, int chunkItems);
+epicsShareFunc void * epicsShareAPI dbmfMalloc(size_t bytes);
+epicsShareFunc char * epicsShareAPI dbmfStrdup(unsigned char *str);
+epicsShareFunc void epicsShareAPI dbmfFree(void* bytes);
+epicsShareFunc void epicsShareAPI dbmfFreeChunks(void);
+epicsShareFunc int epicsShareAPI dbmfShow(int level);
 
 /* Rules:
  * 1) Size is always made a multiple of 8.

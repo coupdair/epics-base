@@ -6,6 +6,7 @@
 * EPICS BASE is distributed subject to a Software License Agreement found
 * in file LICENSE that is included with this distribution. 
 \*************************************************************************/
+/* Revision-Id: anj@aps.anl.gov-20101007191624-sqws79ec9gxn7reb */
 /*
  *	Author: Julie Sander and Bob Dalesio
  *	Date:	07-27-87
@@ -20,7 +21,6 @@
 #include "osiUnistd.h"
 #include "dbDefs.h"
 #include "epicsMath.h"
-#include "epicsTypes.h"
 #include "errlog.h"
 #include "postfix.h"
 #include "postfixPvt.h"
@@ -32,10 +32,6 @@ static int cond_search(const char **ppinst, int match);
 #define PI 3.14159265358979323
 #endif
 
-/* Turn off global optimization for 64-bit MSVC builds */
-#if defined(_WIN32) && defined(_M_X64) && !defined(_MINGW)
-#  pragma optimize("g", off)
-#endif
 
 /* calcPerform
  *
@@ -47,8 +43,7 @@ epicsShareFunc long
     double stack[CALCPERFORM_STACK+1];	/* zero'th entry not used */
     double *ptop;			/* stack pointer */
     double top; 			/* value from top of stack */
-    epicsInt32 itop;			/* integer from top of stack */
-    epicsUInt32 utop;			/* unsigned integer from top of stack */
+    int itop;				/* integer from top of stack */
     int op;
     int nargs;
 
@@ -60,14 +55,14 @@ epicsShareFunc long
 	switch (op){
 
 	case LITERAL_DOUBLE:
-	    memcpy(++ptop, pinst, sizeof(double));
+	    memcpy((void *)++ptop, pinst, sizeof(double));
 	    pinst += sizeof(double);
 	    break;
 
 	case LITERAL_INT:
-	    memcpy(&itop, pinst, sizeof(epicsInt32));
+	    memcpy(&itop, pinst, sizeof(int));
 	    *++ptop = itop;
-	    pinst += sizeof(epicsInt32);
+	    pinst += sizeof(int);
 	    break;
 
 	case FETCH_VAL:
@@ -141,11 +136,11 @@ epicsShareFunc long
 	    break;
 
 	case MODULO:
-	    itop = (epicsInt32) *ptop--;
+	    itop = (long) *ptop--;
 	    if (itop)
-		*ptop = (epicsInt32) *ptop % itop;
+		*ptop = (long) *ptop % itop;
 	    else
-		*ptop = epicsNAN;
+		*ptop = epicsNAN;   /* NaN */
 	    break;
 
 	case POWER:
@@ -154,7 +149,7 @@ epicsShareFunc long
 	    break;
 
 	case ABS_VAL:
-	    *ptop = fabs(*ptop);
+	    if (*ptop < 0.0) *ptop = - *ptop;
 	    break;
 
 	case EXP:
@@ -266,7 +261,7 @@ epicsShareFunc long
 
 	case NINT:
 	    top = *ptop;
-	    *ptop = (epicsInt32) (top >= 0 ? top + 0.5 : top - 0.5);
+	    *ptop = (double)(long)(top >= 0 ? top + 0.5 : top - 0.5);
 	    break;
 
 	case RANDOM:
@@ -287,45 +282,34 @@ epicsShareFunc long
 	    *ptop = ! *ptop;
 	    break;
 
-        /* For bitwise operations on values with bit 31 set, double values
-         * must first be cast to unsigned to correctly set that bit; the
-         * double value must be negative in that case. The result must be
-         * cast to a signed integer before converting to the double result.
-         */
-
 	case BIT_OR:
-	    utop = *ptop--;
-	    *ptop = (epicsInt32) ((epicsUInt32) *ptop | utop);
+	    itop = (long) *ptop--;
+	    *ptop = (long) *ptop | itop;
 	    break;
 
 	case BIT_AND:
-	    utop = *ptop--;
-	    *ptop = (epicsInt32) ((epicsUInt32) *ptop & utop);
+	    itop = (long) *ptop--;
+	    *ptop = (long) *ptop & itop;
 	    break;
 
 	case BIT_EXCL_OR:
-	    utop = *ptop--;
-	    *ptop = (epicsInt32) ((epicsUInt32) *ptop ^ utop);
+	    itop = (long) *ptop--;
+	    *ptop = (long) *ptop ^ itop;
 	    break;
 
 	case BIT_NOT:
-	    utop = *ptop;
-	    *ptop = (epicsInt32) ~utop;
+	    itop = (long) *ptop;
+	    *ptop = ~itop;
 	    break;
 
-        /* The shift operators use signed integers, so a right-shift will
-         * extend the sign bit into the left-hand end of the value. The
-         * double-casting through unsigned here is important, see above.
-         */
-
 	case RIGHT_SHIFT:
-	    utop = *ptop--;
-	    *ptop = ((epicsInt32) (epicsUInt32) *ptop) >> (utop & 31);
+	    itop = (long) *ptop--;
+	    *ptop = (long) *ptop >> itop;
 	    break;
 
 	case LEFT_SHIFT:
-	    utop = *ptop--;
-	    *ptop = ((epicsInt32) (epicsUInt32) *ptop) << (utop & 31);
+	    itop = (long) *ptop--;
+	    *ptop = (long) *ptop << itop;
 	    break;
 
 	case NOT_EQ:
@@ -382,9 +366,6 @@ epicsShareFunc long
     *presult = *ptop;
     return 0;
 }
-#if defined(_WIN32) && defined(_M_X64) && !defined(_MINGW)
-#  pragma optimize("", on)
-#endif
 
 
 epicsShareFunc long
@@ -400,7 +381,7 @@ calcArgUsage(const char *pinst, unsigned long *pinputs, unsigned long *pstores)
 	    pinst += sizeof(double);
 	    break;
 	case LITERAL_INT:
-	    pinst += sizeof(epicsInt32);
+	    pinst += sizeof(int);
 	    break;
 	case MIN:
 	case MAX:
@@ -487,7 +468,7 @@ static int cond_search(const char **ppinst, int match)
 	    pinst += sizeof(double);
 	    break;
 	case LITERAL_INT:
-	    pinst += sizeof(epicsInt32);
+	    pinst += sizeof(int);
 	    break;
 	case MIN:
 	case MAX:

@@ -4,7 +4,8 @@
 * EPICS BASE is distributed subject to a Software License Agreement found
 * in file LICENSE that is included with this distribution. 
 \*************************************************************************/
-/*
+/* Revision-Id: anj@aps.anl.gov-20101005192737-disfz3vs0f3fiixd
+ *
  * Macro expansion of environment variables
  */
 
@@ -13,33 +14,21 @@
 #include <string.h>
 
 #define epicsExportSharedSymbols
-#include "errlog.h"
+#include "cantProceed.h"
 #include "epicsString.h"
 #include "macLib.h"
 
 char * epicsShareAPI
 macEnvExpand(const char *str)
 {
-    return macDefExpand(str, NULL);
-}
-
-char * epicsShareAPI
-macDefExpand(const char *str, MAC_HANDLE *macros)
-{
     MAC_HANDLE *handle;
-    static const char * pairs[] = { "", "environ", NULL, NULL };
+    static char *pairs[] = { "", "environ", NULL, NULL };
     long destCapacity = 128;
     char *dest = NULL;
     int n;
-    
-    if (macros) {
-        handle = macros;
-    } else {
-        if (macCreateHandle(&handle, pairs)){
-            errlogMessage("macDefExpand: macCreateHandle failed.");
-            return NULL;
-        }
-    }
+
+    if (macCreateHandle(&handle, pairs))
+        cantProceed("macEnvExpand: macCreateHandle failed.");
 
     do {
         destCapacity *= 2;
@@ -48,10 +37,7 @@ macDefExpand(const char *str, MAC_HANDLE *macros)
          * keep the original contents.
          */
         free(dest);
-        dest = malloc(destCapacity);
-        if(!dest)
-            goto done;
-
+        dest = mallocMustSucceed(destCapacity, "macEnvExpand");
         n = macExpandString(handle, str, dest, destCapacity);
     } while (n >= (destCapacity - 1));
 
@@ -65,11 +51,7 @@ macDefExpand(const char *str, MAC_HANDLE *macros)
             dest = realloc(dest, n);
     }
 
-done:
-    if (macros == NULL) {
-        if (macDeleteHandle(handle)) {
-            errlogMessage("macDefExpand: macDeleteHandle failed.");
-        }
-    }
+    if (macDeleteHandle(handle))
+        cantProceed("macEnvExpand: macDeleteHandle failed.");
     return dest;
 }

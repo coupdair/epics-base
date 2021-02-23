@@ -4,7 +4,7 @@
 * Copyright (c) 2002 The Regents of the University of California, as
 *     Operator of Los Alamos National Laboratory.
 * EPICS BASE is distributed subject to a Software License Agreement found
-* in file LICENSE that is included with this distribution.
+* in file LICENSE that is included with this distribution. 
 \*************************************************************************/
 /*
  * vxWorks specific socket include
@@ -15,7 +15,7 @@
 
 /* This is needed for vxWorks 6.8 to prevent an obnoxious compiler warning */
 #ifndef _VSB_CONFIG_FILE
-#   define _VSB_CONFIG_FILE <../lib/h/config/vsbConfig.h>
+#define _VSB_CONFIG_FILE <../lib/h/config/vsbConfig.h>
 #endif
 
 #include <errno.h>
@@ -44,7 +44,7 @@ int sysClkRateGet(void);
 #ifdef __cplusplus
 }
 #endif
-
+ 
 typedef int                     SOCKET;
 #define INVALID_SOCKET		(-1)
 #define SOCKERRNO               errno
@@ -72,9 +72,7 @@ typedef int osiSocklen_t;
 #define SOCK_ENOBUFS ENOBUFS
 #define SOCK_ECONNRESET ECONNRESET
 #define SOCK_ETIMEDOUT ETIMEDOUT
-#define SOCK_EACCES EACCES
 #define SOCK_EADDRINUSE EADDRINUSE
-#define SOCK_EADDRNOTAVAIL EADDRNOTAVAIL
 #define SOCK_ECONNREFUSED ECONNREFUSED
 #define SOCK_ECONNABORTED ECONNABORTED
 #define SOCK_EINPROGRESS EINPROGRESS
@@ -94,7 +92,7 @@ typedef int osiSocklen_t;
 
 #ifndef INADDR_NONE
 #   define INADDR_NONE (0xffffffff)
-#endif
+#endif 
 
 #if defined(_SIZEOF_ADDR_IFREQ)
 #   define ifreq_size(pifreq) _SIZEOF_ADDR_IFREQ(*pifreq)
@@ -105,3 +103,5 @@ typedef int osiSocklen_t;
 #endif
 
 #endif /*osdSockH*/
+ 
+

@@ -279,11 +279,5 @@ MAIN(epicsMutexTest)
 
     epicsMutexPerformance ();
 
-    free(pinfo);
-    free(arg);
-    free(name);
-    free(id);
-    epicsMutexDestroy(mutex);
-
     return testDone();
 }

@@ -7,6 +7,11 @@
 * in file LICENSE that is included with this distribution.
 \*************************************************************************/
 
+/*
+ * Revision-Id: anj@aps.anl.gov-20101005192737-disfz3vs0f3fiixd
+ *
+ */
+
 #ifndef INC_osdTime_H
 #define INC_osdTime_H
 

@@ -6,7 +6,8 @@
 * EPICS BASE is distributed subject to a Software License Agreement found
 * in file LICENSE that is included with this distribution. 
 \*************************************************************************/
-/*
+/* Revision-Id: anj@aps.anl.gov-20101005192737-disfz3vs0f3fiixd
+ *
  * Implementation of core macro substitution library (macLib)
  *
  * The implementation is fairly unsophisticated and linked lists are
@@ -102,7 +103,7 @@ epicsShareAPI macCreateHandle(
     MAC_HANDLE  **pHandle,      /* address of variable to receive pointer */
                                 /* to new macro substitution context */
 
-    const char * pairs[] )      /* pointer to NULL-terminated array of */
+    char        *pairs[] )      /* pointer to NULL-terminated array of */
                                 /* {name,value} pair strings; a NULL */
                                 /* value implies undefined; a NULL */
                                 /* argument implies no macros */
@@ -252,19 +253,9 @@ epicsShareAPI macPutValue(
     /* handle NULL value case: if name was found, delete entry (may be
        several entries at different scoping levels) */
     if ( value == NULL ) {
-        /* 
-         * FIXME: shouldn't be able to delete entries from lower scopes
-         * NOTE: when this is changed, this functionality of removing
-         * a macro from all scopes will still be needed by iocshEnvClear
-         */
-        while ( ( entry = lookup( handle, name, FALSE ) ) != NULL ) {
-            int done = strcmp(entry->type, "environment variable") == 0;
+        /* FIXME: shouldn't be able to delete entries from lower scopes */
+        while ( ( entry = lookup( handle, name, FALSE ) ) != NULL )
             delete( handle, entry );
-            
-            if (done)
-                break;
-        }
-        
         return 0;
     }
 
@@ -867,9 +858,9 @@ static void refer ( MAC_HANDLE *handle, MAC_ENTRY *entry, int level,
         if ( !refentry->visited ) {
             /* reference is good, use it */
             if ( !handle->dirty ) {
-                /* copy the already-expanded value, merge any error status */
+                /* copy the already-expanded value, and its error status! */
                 cpy2val( refentry->value, &v, valend );
-                entry->error = entry->error || refentry->error;
+                entry->error = refentry->error;
             } else {
                 /* translate raw value */
                 const char *rv = refentry->rawval;

@@ -14,6 +14,8 @@
  *
  */
 
+static char ht2992_h_RCSID[] = "Revision-Id: anj@aps.anl.gov-20101005192737-disfz3vs0f3fiixd";
+
 /********************************/
 /* GLOBAL DATA			*/
 /********************************/

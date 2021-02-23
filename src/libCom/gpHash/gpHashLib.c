@@ -4,8 +4,9 @@
 * Copyright (c) 2002 The Regents of the University of California, as
 *     Operator of Los Alamos National Laboratory.
 * EPICS BASE is distributed subject to a Software License Agreement found
-* in file LICENSE that is included with this distribution.
+* in file LICENSE that is included with this distribution. 
 \*************************************************************************/
+/* Revision-Id: anj@aps.anl.gov-20131211235029-rgq7n0w50qu0gqn8 */
 
 /* Author:  Marty Kraimer Date:    04-07-94 */
 
@@ -59,7 +60,7 @@ void epicsShareAPI gphInitPvt(gphPvt **ppvt, int size)
     return;
 }
 
-GPHENTRY * epicsShareAPI gphFindParse(gphPvt *pgphPvt, const char *name, size_t len, void *pvtid)
+GPHENTRY * epicsShareAPI gphFind(gphPvt *pgphPvt, const char *name, void *pvtid)
 {
     ELLLIST **paplist;
     ELLLIST *gphlist;
@@ -69,7 +70,7 @@ GPHENTRY * epicsShareAPI gphFindParse(gphPvt *pgphPvt, const char *name, size_t 
     if (pgphPvt == NULL) return NULL;
     paplist = pgphPvt->paplist;
     hash = epicsMemHash((char *)&pvtid, sizeof(void *), 0);
-    hash = epicsMemHash(name, len, hash) & pgphPvt->mask;
+    hash = epicsStrHash(name, hash) & pgphPvt->mask;
 
     epicsMutexMustLock(pgphPvt->lock);
     gphlist = paplist[hash];
@@ -81,18 +82,12 @@ GPHENTRY * epicsShareAPI gphFindParse(gphPvt *pgphPvt, const char *name, size_t 
 
     while (pgphNode) {
         if (pvtid == pgphNode->pvtid &&
-            strlen(pgphNode->name) == len &&
-            strncmp(name, pgphNode->name, len) == 0) break;
+            strcmp(name, pgphNode->name) == 0) break;
         pgphNode = (GPHENTRY *) ellNext((ELLNODE *)pgphNode);
     }
 
     epicsMutexUnlock(pgphPvt->lock);
     return pgphNode;
-}
-
-GPHENTRY * epicsShareAPI gphFind(gphPvt *pgphPvt, const char *name, void *pvtid)
-{
-    return gphFindParse(pgphPvt, name, strlen(name), pvtid);
 }
 
 GPHENTRY * epicsShareAPI gphAdd(gphPvt *pgphPvt, const char *name, void *pvtid)
@@ -110,11 +105,7 @@ GPHENTRY * epicsShareAPI gphAdd(gphPvt *pgphPvt, const char *name, void *pvtid)
     epicsMutexMustLock(pgphPvt->lock);
     plist = paplist[hash];
     if (plist == NULL) {
-        plist = calloc(1, sizeof(ELLLIST));
-        if(!plist){
-            epicsMutexUnlock(pgphPvt->lock);
-            return NULL;
-        }
+        plist = callocMustSucceed(1, sizeof(ELLLIST), "gphAdd");
         ellInit(plist);
         paplist[hash] = plist;
     }
@@ -129,12 +120,10 @@ GPHENTRY * epicsShareAPI gphAdd(gphPvt *pgphPvt, const char *name, void *pvtid)
         pgphNode = (GPHENTRY *) ellNext((ELLNODE *)pgphNode);
     }
 
-    pgphNode = calloc(1, sizeof(GPHENTRY));
-    if(pgphNode) {
-        pgphNode->name = name;
-        pgphNode->pvtid = pvtid;
-        ellAdd(plist, (ELLNODE *)pgphNode);
-    }
+    pgphNode = callocMustSucceed(1, sizeof(GPHENTRY), "gphAdd");
+    pgphNode->name = name;
+    pgphNode->pvtid = pvtid;
+    ellAdd(plist, (ELLNODE *)pgphNode);
 
     epicsMutexUnlock(pgphPvt->lock);
     return (pgphNode);

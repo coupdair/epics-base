@@ -6,11 +6,10 @@
 * in file LICENSE that is included with this distribution.
 \*************************************************************************/
 /*
+ * Revision-Id: anj@aps.anl.gov-20110823182000-bubidbqy4olqqdvq
+ *
  * Author: W. Eric Norum
  */
-#define __BSD_VISIBLE 1
-#include <sys/types.h>
-#include <sys/socket.h>
 
 #include <epicsStdio.h>
 #include <rtems.h>
@@ -41,37 +40,8 @@ void osdTimeRegister(void)
 
 int osdNTPGet(struct timespec *ts)
 {
-    static unsigned bequiet;
-    ssize_t ret;
-
     if (ntpSocket < 0)
         return -1;
-
-    /* rtems_bsdnet_get_ntp() will send an NTP request, then
-     * call recvfrom() exactly once to process the expected reply.
-     * Any leftovers in the socket buffer (ie. duplicates of
-     * previous replies) will cause problems.
-     * So flush out the socket buffer first.
-     */
-    do {
-        char junk[16];
-
-        ret = recvfrom(ntpSocket, junk, sizeof(junk), MSG_DONTWAIT, NULL, NULL);
-        if (ret == -1 && errno == EAGAIN) {
-            break;
-        }
-        else if (ret == -1) {
-            if (!bequiet) {
-                printf("osdNTPGet cleaner error: %s\n", strerror(errno));
-                bequiet = 1;
-            }
-            break;
-        }
-        else {
-            bequiet = 0;
-        }
-    } while (ret > 0);
-
     return rtems_bsdnet_get_ntp(ntpSocket, NULL, ts);
 }
 
@@ -121,7 +91,7 @@ int epicsTime_gmtime ( const time_t *pAnsiTime, struct tm *pTM )
         return epicsTimeOK;
     }
     else {
-        return errno;
+        return epicsTimeERROR;
     }
 }
 
@@ -132,7 +102,7 @@ int epicsTime_localtime ( const time_t *clock, struct tm *result )
         return epicsTimeOK;
     }
     else {
-        return errno;
+        return epicsTimeERROR;
     }
 }
 

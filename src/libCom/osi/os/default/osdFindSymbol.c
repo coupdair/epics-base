@@ -6,22 +6,16 @@
 * EPICS BASE is distributed subject to a Software License Agreement found
 * in file LICENSE that is included with this distribution. 
 \*************************************************************************/
-/* osi/os/default/osdFindSymbol.c */
+/* osi/os/default/epicsFindSymbol.c */
 
 #define epicsExportSharedSymbols
 #include "epicsFindSymbol.h"
 
 epicsShareFunc void * epicsLoadLibrary(const char *name)
-{
-    return 0;
-}
+{ return 0; }
 
 epicsShareFunc const char *epicsLoadError(void)
-{
-    return "epicsLoadLibrary not implemented";
-}
+{ return "epicsLoadLibrary not implemented"; }
 
 epicsShareFunc void * epicsShareAPI epicsFindSymbol(const char *name)
-{
-    return 0;
-}
+{ return 0;}

@@ -18,18 +18,28 @@
 
 epicsShareFunc float epicsConvertDoubleToFloat(double value)
 {
-    double abs;
+    float rtnvalue;
 
-    if (value == 0 || !finite(value))
-        return (float) value;
+    if (value == 0) {
+        rtnvalue = 0;
+    } else if (!finite(value)) {
+        rtnvalue = (float)value;
+    } else {
+        double abs = fabs(value);
 
-    abs = fabs(value);
-
-    if (abs >= FLT_MAX)
-        return (value > 0) ? FLT_MAX : -FLT_MAX;
-
-    if (abs <= FLT_MIN)
-        return (value > 0) ? FLT_MIN : -FLT_MIN;
-
-    return (float) value;
+        if (abs >= FLT_MAX) {
+            if (value > 0)
+                rtnvalue = FLT_MAX;
+            else
+                rtnvalue = -FLT_MAX;
+        } else if (abs <= FLT_MIN) {
+            if (value > 0)
+                rtnvalue = FLT_MIN;
+            else
+                rtnvalue = -FLT_MIN;
+        } else {
+            rtnvalue = (float)value;
+        }
+    }
+    return rtnvalue;
 }

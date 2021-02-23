@@ -8,6 +8,8 @@
 * in file LICENSE that is included with this distribution. 
 \*************************************************************************/
 /*
+ *      Revision-Id: anj@aps.anl.gov-20101005192737-disfz3vs0f3fiixd
+ *
  *      Author  W. Eric Norum
  *              norume@aps.anl.gov
  *              630 252 4793
@@ -15,9 +17,6 @@
 
 #include <stdexcept>
 #include <string.h>
-
-#include <stdlib.h>
-#include <stdio.h>
 
 #define epicsExportSharedSymbols
 #include "epicsMessageQueue.h"
@@ -75,44 +74,22 @@ epicsShareFunc epicsMessageQueueId epicsShareAPI epicsMessageQueueCreate(
     epicsMessageQueueId pmsg;
     unsigned int slotBytes, slotLongs;
 
-    if(capacity == 0)
-        return NULL;
-
-    pmsg = (epicsMessageQueueId)calloc(1, sizeof(*pmsg));
-    if(!pmsg)
-        return NULL;
-
+    assert(capacity != 0);
+    pmsg = (epicsMessageQueueId)callocMustSucceed(1, sizeof(*pmsg), "epicsMessageQueueCreate");
     pmsg->capacity = capacity;
     pmsg->maxMessageSize = maxMessageSize;
     slotLongs = 1 + ((maxMessageSize + sizeof(unsigned long) - 1) / sizeof(unsigned long));
     slotBytes = slotLongs * sizeof(unsigned long);
-
-    pmsg->mutex = epicsMutexCreate();
-    pmsg->buf = (unsigned long*)calloc(pmsg->capacity, slotBytes);
-    if(!pmsg->buf || !pmsg->mutex) {
-        if(pmsg->mutex)
-            epicsMutexDestroy(pmsg->mutex);
-        free(pmsg->buf);
-        free(pmsg);
-        return NULL;
-    }
-
+    pmsg->buf = (unsigned long *)callocMustSucceed(pmsg->capacity, slotBytes, "epicsMessageQueueCreate");
     pmsg->inPtr = pmsg->outPtr = pmsg->firstMessageSlot = (char *)&pmsg->buf[0];
     pmsg->lastMessageSlot = (char *)&pmsg->buf[(capacity - 1) * slotLongs];
     pmsg->full = false;
     pmsg->slotSize = slotBytes;
-
+    pmsg->mutex = epicsMutexMustCreate();
     ellInit(&pmsg->sendQueue);
     ellInit(&pmsg->receiveQueue);
     ellInit(&pmsg->eventFreeList);
     return pmsg;
-}
-
-static void
-freeEventNode(struct eventNode *enode)
-{
-    epicsEventDestroy(enode->event);
-    free(enode);
 }
 
 epicsShareFunc void epicsShareAPI
@@ -122,7 +99,8 @@ epicsMessageQueueDestroy(epicsMessageQueueId pmsg)
 
     while ((evp = reinterpret_cast < struct eventNode * >
             ( ellGet(&pmsg->eventFreeList) ) ) != NULL) {
-        freeEventNode(evp);
+        epicsEventDestroy(evp->event);
+        free(evp);
     }
     epicsMutexDestroy(pmsg->mutex);
     free(pmsg->buf);
@@ -136,21 +114,15 @@ getEventNode(epicsMessageQueueId pmsg)
 
     evp = reinterpret_cast < struct eventNode * > ( ellGet(&pmsg->eventFreeList) );
     if (evp == NULL) {
-        evp = (struct eventNode *) calloc(1, sizeof(*evp));
-        if (evp) {
-            evp->event = epicsEventCreate(epicsEventEmpty);
-            if (evp->event == NULL) {
-                free(evp);
-                return NULL;
-            }
-        }
+        evp = (struct eventNode *) callocMustSucceed(1, sizeof(*evp),
+                                                     "epicsMessageQueueGetEventNode");
+        evp->event = epicsEventMustCreate(epicsEventEmpty);
     }
     return evp;
 }
 
 static int
-mySend(epicsMessageQueueId pmsg, void *message, unsigned int size,
-    double timeout)
+mySend(epicsMessageQueueId pmsg, void *message, unsigned int size, bool wait, bool haveTimeout, double timeout)
 {
     char *myInPtr, *nextPtr;
     struct threadNode *pthr;
@@ -161,14 +133,13 @@ mySend(epicsMessageQueueId pmsg, void *message, unsigned int size,
     /*
      * See if message can be sent
      */
-    epicsMutexMustLock(pmsg->mutex);
-
+    epicsMutexLock(pmsg->mutex);
     if ((pmsg->numberOfSendersWaiting > 0)
      || (pmsg->full && (ellFirst(&pmsg->receiveQueue) == NULL))) {
         /*
          * Return if not allowed to wait
          */
-        if (timeout == 0) {
+        if (!wait) {
             epicsMutexUnlock(pmsg->mutex);
             return -1;
         }
@@ -179,32 +150,19 @@ mySend(epicsMessageQueueId pmsg, void *message, unsigned int size,
         struct threadNode threadNode;
         threadNode.evp = getEventNode(pmsg);
         threadNode.eventSent = false;
-        if (!threadNode.evp) {
-            epicsMutexUnlock(pmsg->mutex);
-            return -1;
-        }
-
         ellAdd(&pmsg->sendQueue, &threadNode.link);
         pmsg->numberOfSendersWaiting++;
-
         epicsMutexUnlock(pmsg->mutex);
-
-        epicsEventStatus status;
-        if (timeout > 0)
-            status = epicsEventWaitWithTimeout(threadNode.evp->event, timeout);
+        if(haveTimeout)
+            epicsEventWaitWithTimeout(threadNode.evp->event, timeout);
         else
-            status = epicsEventWait(threadNode.evp->event);
-
-        epicsMutexMustLock(pmsg->mutex);
-
+            epicsEventWait(threadNode.evp->event);
+        epicsMutexLock(pmsg->mutex);
         if(!threadNode.eventSent)
             ellDelete(&pmsg->sendQueue, &threadNode.link);
         pmsg->numberOfSendersWaiting--;
-
         ellAdd(&pmsg->eventFreeList, &threadNode.evp->link);
-
-        if ((pmsg->full && (ellFirst(&pmsg->receiveQueue) == NULL)) ||
-            status != epicsEventOK) {
+        if (pmsg->full && (ellFirst(&pmsg->receiveQueue) == NULL)) {
             epicsMutexUnlock(pmsg->mutex);
             return -1;
         }
@@ -242,29 +200,25 @@ mySend(epicsMessageQueueId pmsg, void *message, unsigned int size,
 }
 
 epicsShareFunc int epicsShareAPI
-epicsMessageQueueTrySend(epicsMessageQueueId pmsg, void *message,
-    unsigned int size)
+epicsMessageQueueTrySend(epicsMessageQueueId pmsg, void *message, unsigned int size)
 {
-    return mySend(pmsg, message, size, 0);
+    return mySend(pmsg, message, size, false, false, 0.0);
 }
 
 epicsShareFunc int epicsShareAPI
-epicsMessageQueueSend(epicsMessageQueueId pmsg, void *message,
-    unsigned int size)
+epicsMessageQueueSend(epicsMessageQueueId pmsg, void *message, unsigned int size)
 {
-    return mySend(pmsg, message, size, -1);
+    return mySend(pmsg, message, size, true, false, 0.0);
 }
 
 epicsShareFunc int epicsShareAPI
-epicsMessageQueueSendWithTimeout(epicsMessageQueueId pmsg, void *message,
-    unsigned int size, double timeout)
+epicsMessageQueueSendWithTimeout(epicsMessageQueueId pmsg, void *message, unsigned int size, double timeout)
 {
-    return mySend(pmsg, message, size, timeout);
+    return mySend(pmsg, message, size, true, true, timeout);
 }
 
 static int
-myReceive(epicsMessageQueueId pmsg, void *message, unsigned int size,
-    double timeout)
+myReceive(epicsMessageQueueId pmsg, void *message, unsigned int size, bool wait, bool haveTimeout, double timeout)
 {
     char *myOutPtr;
     unsigned long l;
@@ -273,8 +227,7 @@ myReceive(epicsMessageQueueId pmsg, void *message, unsigned int size,
     /*
      * If there's a message on the queue, copy it
      */
-    epicsMutexMustLock(pmsg->mutex);
-
+    epicsMutexLock(pmsg->mutex);
     myOutPtr = (char *)pmsg->outPtr;
     if ((myOutPtr != pmsg->inPtr) || pmsg->full) {
         int ret;
@@ -307,7 +260,7 @@ myReceive(epicsMessageQueueId pmsg, void *message, unsigned int size,
     /*
      * Return if not allowed to wait
      */
-    if (timeout == 0) {
+    if (!wait) {
         epicsMutexUnlock(pmsg->mutex);
         return -1;
     }
@@ -329,54 +282,38 @@ myReceive(epicsMessageQueueId pmsg, void *message, unsigned int size,
     threadNode.buf = message;
     threadNode.size = size;
     threadNode.eventSent = false;
-
-    if (!threadNode.evp) {
-        epicsMutexUnlock(pmsg->mutex);
-        return -1;
-    }
-
     ellAdd(&pmsg->receiveQueue, &threadNode.link);
     epicsMutexUnlock(pmsg->mutex);
-
-    epicsEventStatus status;
-    if (timeout > 0)
-        status = epicsEventWaitWithTimeout(threadNode.evp->event, timeout);
+    if(haveTimeout)
+        epicsEventWaitWithTimeout(threadNode.evp->event, timeout);
     else
-        status = epicsEventWait(threadNode.evp->event);
-
-    epicsMutexMustLock(pmsg->mutex);
-
-    if (!threadNode.eventSent)
+        epicsEventWait(threadNode.evp->event);
+    epicsMutexLock(pmsg->mutex);
+    if(!threadNode.eventSent)
         ellDelete(&pmsg->receiveQueue, &threadNode.link);
     ellAdd(&pmsg->eventFreeList, &threadNode.evp->link);
-
     epicsMutexUnlock(pmsg->mutex);
-
-    if (threadNode.eventSent && (threadNode.size <= size) &&
-        status == epicsEventOK)
+    if(threadNode.eventSent && (threadNode.size <= size))
         return threadNode.size;
     return -1;
 }
 
 epicsShareFunc int epicsShareAPI
-epicsMessageQueueTryReceive(epicsMessageQueueId pmsg, void *message,
-    unsigned int size)
+epicsMessageQueueTryReceive(epicsMessageQueueId pmsg, void *message, unsigned int size)
 {
-    return myReceive(pmsg, message, size, 0);
+    return myReceive(pmsg, message, size, false, false, 0.0);
 }
 
 epicsShareFunc int epicsShareAPI
-epicsMessageQueueReceive(epicsMessageQueueId pmsg, void *message,
-    unsigned int size)
+epicsMessageQueueReceive(epicsMessageQueueId pmsg, void *message, unsigned int size)
 {
-    return myReceive(pmsg, message, size, -1);
+    return myReceive(pmsg, message, size, true, false, 0.0);
 }
 
 epicsShareFunc int epicsShareAPI
-epicsMessageQueueReceiveWithTimeout(epicsMessageQueueId pmsg, void *message,
-    unsigned int size, double timeout)
+epicsMessageQueueReceiveWithTimeout(epicsMessageQueueId pmsg, void *message, unsigned int size, double timeout)
 {
-    return myReceive(pmsg, message, size, timeout);
+    return myReceive(pmsg, message, size, true, true, timeout);
 }
 
 epicsShareFunc int epicsShareAPI
@@ -385,7 +322,7 @@ epicsMessageQueuePending(epicsMessageQueueId pmsg)
     char *myInPtr, *myOutPtr;
     int nmsg;
 
-    epicsMutexMustLock(pmsg->mutex);
+    epicsMutexLock(pmsg->mutex);
     myInPtr = (char *)pmsg->inPtr;
     myOutPtr = (char *)pmsg->outPtr;
     if (pmsg->full)

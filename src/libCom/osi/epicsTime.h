@@ -17,7 +17,6 @@
 #include "shareLib.h"
 #include "epicsTypes.h"
 #include "osdTime.h"
-#include "errMdef.h"
 
 /* The EPICS Epoch is 00:00:00 Jan 1, 1990 UTC */
 #define POSIX_TIME_AT_EPICS_EPOCH 631152000u
@@ -106,12 +105,10 @@ public:
     epicsTime & operator = ( const local_tm_nano_sec & );
 
     /*
-     * convert to and from ANSI Cs "struct tm" (with nano seconds)
+     * convert to ANSI Cs "struct tm" (with nano seconds)
      * adjusted for GM time (UTC)
      */
     operator gm_tm_nano_sec () const;
-    epicsTime ( const gm_tm_nano_sec & );
-    epicsTime & operator = ( const gm_tm_nano_sec & );
 
     /* convert to and from POSIX RTs "struct timespec" */
     operator struct timespec () const;
@@ -173,15 +170,9 @@ private:
 extern "C" {
 #endif /* __cplusplus */
 
-/* epicsTime routines return S_time_ error status values */
+/* All epicsTime routines return (-1,0) for (failure,success) */
 #define epicsTimeOK 0
-#define S_time_noProvider       (M_time| 1) /*No time provider*/
-#define S_time_badEvent         (M_time| 2) /*Bad event number*/
-#define S_time_badArgs          (M_time| 3) /*Invalid arguments*/
-#define S_time_noMemory         (M_time| 4) /*Out of memory*/
-#define S_time_unsynchronized   (M_time| 5) /*Provider not synchronized*/
-#define S_time_timezone         (M_time| 6) /*Invalid timeone*/
-#define S_time_conversion       (M_time| 7) /*Time conversion error*/
+#define epicsTimeERROR (-1)
 
 /*Some special values for eventNumber*/
 #define epicsTimeEventCurrentTime 0
@@ -203,14 +194,12 @@ epicsShareFunc int epicsShareAPI epicsTimeToTime_t (
 epicsShareFunc int epicsShareAPI epicsTimeFromTime_t (
     epicsTimeStamp * pDest, time_t src );
 
-/* convert to and from ANSI C's "struct tm" with nano seconds */
+/*convert to and from ANSI C's "struct tm" with nano seconds */
 epicsShareFunc int epicsShareAPI epicsTimeToTM (
     struct tm * pDest, unsigned long * pNSecDest, const epicsTimeStamp * pSrc );
 epicsShareFunc int epicsShareAPI epicsTimeToGMTM (
     struct tm * pDest, unsigned long * pNSecDest, const epicsTimeStamp * pSrc );
 epicsShareFunc int epicsShareAPI epicsTimeFromTM (
-    epicsTimeStamp * pDest, const struct tm * pSrc, unsigned long nSecSrc );
-epicsShareFunc int epicsShareAPI epicsTimeFromGMTM (
     epicsTimeStamp * pDest, const struct tm * pSrc, unsigned long nSecSrc );
 
 /* convert to and from POSIX RT's "struct timespec" */
@@ -319,11 +308,6 @@ inline bool epicsTime::operator > ( const epicsTime & rhs ) const
 }
 
 inline epicsTime & epicsTime::operator = ( const local_tm_nano_sec & rhs )
-{
-    return *this = epicsTime ( rhs );
-}
-
-inline epicsTime & epicsTime::operator = ( const gm_tm_nano_sec & rhs )
 {
     return *this = epicsTime ( rhs );
 }

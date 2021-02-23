@@ -1,1 +1,0 @@
-gddErrorCodes.o: ../gddErrorCodes.cc

@@ -1,5 +1,8 @@
 # CONFIG_SITE.Common.darwin-x86
 #
+# Revision-Id: anj@aps.anl.gov-20130830165151-hoewuuc078dr2pcz
+# This file is maintained by the build community.
+#
 # Site override definitions for darwin-x86 target builds
 #-------------------------------------------------------
 
@@ -13,7 +16,6 @@ ARCH_CLASS = x86_64
 #
 # Uncomment the following 3 lines to build with Apple's GCC instead of CLANG.
 #
-#CMPLR_CLASS = gcc
 #CC  = gcc
 #CCC = g++
 #GNU = YES
@@ -22,7 +24,6 @@ ARCH_CLASS = x86_64
 # To use MacPorts GCC uncomment (and modify if necessary) the following:
 
 #GNU_DIR = /opt/local
-#CMPLR_CLASS = gcc
 #CC = $(GNU_BIN)/gcc -m64
 #CCC = $(GNU_BIN)/g++ -m64
 #GNU = YES

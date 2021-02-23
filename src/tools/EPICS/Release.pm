@@ -5,7 +5,7 @@
 # in file LICENSE that is included with this distribution.
 #*************************************************************************
 
-use Carp;
+# Revision-Id: anj@aps.anl.gov-20101005192737-disfz3vs0f3fiixd
 
 #
 # Parse all relevent configure/RELEASE* files and includes
@@ -17,22 +17,22 @@ sub readReleaseFiles {
     $Rmacros->{'EPICS_HOST_ARCH'} = $hostarch if $hostarch;
 
     return unless (-e $relfile);
-    readRelease($relfile, $Rmacros, $Rapps);
+    &readRelease($relfile, $Rmacros, $Rapps);
 
     if ($hostarch) {
         my $hrelfile = "$relfile.$hostarch";
-        readRelease($hrelfile, $Rmacros, $Rapps) if (-e $hrelfile);
+        &readRelease($hrelfile, $Rmacros, $Rapps) if (-e $hrelfile);
         $hrelfile .= '.Common';
-        readRelease($hrelfile, $Rmacros, $Rapps) if (-e $hrelfile);
+        &readRelease($hrelfile, $Rmacros, $Rapps) if (-e $hrelfile);
     }
 
     if ($arch) {
         my $crelfile = "$relfile.Common.$arch";
-        readRelease($crelfile, $Rmacros, $Rapps) if (-e $crelfile);
+        &readRelease($crelfile, $Rmacros, $Rapps) if (-e $crelfile);
 
         if ($hostarch) {
             my $arelfile = "$relfile.$hostarch.$arch";
-            readRelease($arelfile, $Rmacros, $Rapps) if (-e $arelfile);
+            &readRelease($arelfile, $Rmacros, $Rapps) if (-e $arelfile);
         }
     }
 }
@@ -44,7 +44,7 @@ sub readRelease {
     my ($file, $Rmacros, $Rapps) = @_;
     # $Rmacros is a reference to a hash, $Rapps a ref to an array
 
-    open(my $IN, '<', $file) or croak "Can't open $file: $!\n";
+    open(my $IN, '<', $file) or die "Can't open $file: $!\n";
     while (<$IN>) {
         chomp;
         s/ \r $//x;             # Shouldn't need this, but sometimes...
@@ -69,9 +69,9 @@ sub readRelease {
         my ($op, $path) = m/^ \s* (-? include) \s+ (.*)/x;
         $path = expandMacros($path, $Rmacros);
         if (-e $path) {
-            readRelease($path, $Rmacros, $Rapps);
+            &readRelease($path, $Rmacros, $Rapps);
         } elsif ($op eq "include") {
-            carp "EPICS/Release.pm: Include file '$path' not found\n";
+            warn "EPICS/Release.pm: Include file '$path' not found\n";
         }
     }
     close $IN;
@@ -100,9 +100,9 @@ sub expandRelease {
 
     while (my ($macro, $val) = each %$Rmacros) {
         while (my ($pre,$var,$post) = $val =~ m/ (.*) \$\( (\w+) \) (.*) /x) {
-            carp "EPICS/Release.pm: Undefined macro \$($var) used\n"
+            warn "EPICS/Release.pm: Undefined macro \$($var) used\n"
                 unless exists $Rmacros->{$var};
-            croak "EPICS/Release.pm: Circular definition of macro $macro\n"
+            die "EPICS/Release.pm: Circular definition of macro $macro\n"
                 if $macro eq $var;
             $val = $pre . $Rmacros->{$var} . $post;
             $Rmacros->{$macro} = $val;

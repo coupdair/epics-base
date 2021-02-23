@@ -12,12 +12,6 @@
 #ifndef _EPICS_GETOPT_H
 #define _EPICS_GETOPT_H
 
-#ifdef _MINGW
-
-#include <unistd.h>
-
-#else /* _MINGW */
-
 #include "shareLib.h"
 
 #ifdef __cplusplus
@@ -33,7 +27,5 @@ epicsShareExtern int optind, opterr, optopt;
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* _MINGW */
 
 #endif /* _EPICS_GETOPT_H */

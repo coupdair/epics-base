@@ -14,24 +14,20 @@ build$(DIVIDER)$(ARCH) build: buildInstall
 install$(DIVIDER)$(ARCH) install: buildInstall
 $(ARCH): buildInstall
 
-ifeq ($(filter $(ARCH),$(BUILD_ARCHS)),$(strip $(ARCH)))
+ifeq ($(filter $(ARCH),$(BUILD_ARCHS)),$(ARCH))
     buildInstall$(DIVIDER)$(ARCH) buildInstall: $(TARGETS)
 
     clean$(DIVIDER)$(ARCH) clean:
-	$(RM) cdCommands envPaths dllPath.bat relPaths.sh
+	$(RM) cdCommands envPaths dllPath.bat
 else
     buildInstall$(DIVIDER)$(ARCH) buildInstall:
     clean$(DIVIDER)$(ARCH) clean:
 endif
 
-cdCommands dllPath.bat relPaths.sh: \
-    $(wildcard $(TOP)/configure/RELEASE*) \
-    $(wildcard $(TOP)/configure/CONFIG_SITE*) | $(INSTALL_BIN)
+cdCommands envPaths dllPath.bat: $(wildcard $(TOP)/configure/RELEASE*) \
+    $(wildcard $(TOP)/configure/CONFIG_SITE*) $(INSTALL_BIN)
 	$(CONVERTRELEASE) -a $(ARCH) -t $(IOCS_APPL_TOP) $@
 
-envPaths: $(wildcard $(TOP)/configure/RELEASE*) \
-    $(wildcard $(TOP)/configure/CONFIG_SITE*) | $(INSTALL_BIN)
-	$(CONVERTRELEASE) -t $(IOCS_APPL_TOP) $@
-
 realclean:
-	$(RM) cdCommands envPaths dllPath.bat relPaths.sh
+	$(RM) cdCommands envPaths dllPath.bat
+

@@ -9,6 +9,16 @@
 \*************************************************************************/
 
 /*  
+ *  Revision-Id: anj@aps.anl.gov-20101005192737-disfz3vs0f3fiixd
+ *
+ *                              
+ *                    L O S  A L A M O S
+ *              Los Alamos National Laboratory
+ *               Los Alamos, New Mexico 87545
+ *                                  
+ *  Copyright, 1986, The Regents of the University of California.
+ *                                  
+ *           
  *	Author Jeffrey O. Hill
  *	johill@lanl.gov
  */
@@ -26,7 +36,7 @@ public:
     virtual ~ipAddrToAsciiCallBack () = 0;
 };
 
-class epicsShareClass ipAddrToAsciiTransaction {
+class epicsShareClass ipAddrToAsciiTransaction { // X aCC 655
 public:
     virtual void release () = 0; 
     virtual void ipAddrToAscii ( const osiSockAddr &, ipAddrToAsciiCallBack & ) = 0;
@@ -36,7 +46,7 @@ protected:
     virtual ~ipAddrToAsciiTransaction () = 0;
 };
 
-class epicsShareClass ipAddrToAsciiEngine {
+class epicsShareClass ipAddrToAsciiEngine { // X aCC 655
 public:
     virtual void release () = 0; 
     virtual ipAddrToAsciiTransaction & createTransaction () = 0;
@@ -44,10 +54,6 @@ public:
     static ipAddrToAsciiEngine & allocate ();
 protected:
     virtual ~ipAddrToAsciiEngine () = 0;
-public:
-#ifdef EPICS_PRIVATE_API
-    static void cleanup();
-#endif
 };
 
 #endif // ifdef ipAddrToAsciiAsynchronous_h

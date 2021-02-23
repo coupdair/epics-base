@@ -9,6 +9,11 @@
 /*
  * Authors: Jeff Hill, Marty Kraimer and Andrew Johnson
  */
+ 
+#ifdef __SUNPRO_CC
+using namespace std;
+#endif
+
 #include <cstddef>
 #include <cstdio>
 #include <ctime>
@@ -43,7 +48,7 @@ MAIN(epicsTimeTest)
     const int wasteTime = 100000;
     const int nTimes = 10;
 
-    testPlan(15 + nTimes * 19);
+    testPlan(12 + nTimes * 18);
 
     try {
         const epicsTimeStamp epochTS = {0, 0};
@@ -91,10 +96,6 @@ MAIN(epicsTimeTest)
         et.strftime(buf, sizeof(buf), pFormat);
         testOk(strcmp(buf, "1990-01-01 00.098765432") == 0, "'%s' => '%s'", pFormat, buf);
 
-        pFormat = "%S.%03f";
-        et.strftime(buf, sizeof(buf), pFormat);
-        testOk(strcmp(buf, "00.099") == 0, "'%s' => '%s'", pFormat, buf);
-
         pFormat = "%S.%04f";
         et.strftime(buf, sizeof(buf), pFormat);
         testOk(strcmp(buf, "00.0988") == 0, "'%s' => '%s'", pFormat, buf);
@@ -111,14 +112,6 @@ MAIN(epicsTimeTest)
         pFormat = "%S.%05f";
         et.strftime(smbuf, sizeof(smbuf), pFormat);
         testOk(strcmp(smbuf, "00.*") == 0, "'%s' => '%s'", pFormat, smbuf);
-
-        pFormat = "%S.%03f";
-        (et + 0.9).strftime(buf, sizeof(buf), pFormat);
-        testOk(strcmp(buf, "00.999") == 0, "0.998765 => '%s'", buf);
-
-        pFormat = "%S.%03f";
-        (et + 0.901).strftime(buf, sizeof(buf), pFormat);
-        testOk(strcmp(buf, "00.999") == 0, "0.999765 => '%s'", buf);
 
         pFormat = "%%S.%%05f";
         et.strftime(buf, sizeof(buf), pFormat);
@@ -199,11 +192,6 @@ MAIN(epicsTimeTest)
         local_tm_nano_sec ansiDate = begin;
         epicsTime beginANSI = ansiDate;
         testOk1(beginANSI + diff == now);
-
-        // test struct gmtm round-trip conversion
-        gm_tm_nano_sec ansiGmDate = begin;
-        epicsTime beginGMANSI = ansiGmDate;
-        testOk1(beginGMANSI + diff == now);
 
         // test struct timespec round-trip conversion
         struct timespec ts = begin;

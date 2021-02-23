@@ -19,7 +19,6 @@
 #include <errno.h>
 
 #define epicsExportSharedSymbols
-#define epicsStdioStdStreams
 #include "shareLib.h"
 #include "epicsThread.h"
 #include "epicsStdio.h"
@@ -27,7 +26,7 @@
 static epicsThreadOnceId onceId = EPICS_THREAD_ONCE_INIT;
 static epicsThreadPrivateId stdinThreadPrivateId;
 static epicsThreadPrivateId stdoutThreadPrivateId;
-static epicsThreadPrivateId stderrThreadPrivateId = 0;
+static epicsThreadPrivateId stderrThreadPrivateId;
 
 static void once(void *junk)
 {
@@ -39,27 +38,21 @@ static void once(void *junk)
 FILE * epicsShareAPI epicsGetStdin(void)
 {
     FILE *fp = epicsGetThreadStdin();
-
-    if (!fp)
-        fp = stdin;
+    if(!fp) fp = stdin;
     return fp;
 }
 
 FILE * epicsShareAPI epicsGetStdout(void)
 {
     FILE *fp = epicsGetThreadStdout();
-
-    if (!fp)
-        fp = stdout;
+    if(!fp) fp = stdout;
     return fp;
 }
 
 FILE * epicsShareAPI epicsGetStderr(void)
 {
     FILE *fp = epicsGetThreadStderr();
-
-    if (!fp)
-        fp = stderr;
+    if(!fp) fp = stderr;
     return fp;
 }
 
@@ -77,14 +70,7 @@ FILE * epicsShareAPI epicsGetThreadStdout(void)
 
 FILE * epicsShareAPI epicsGetThreadStderr(void)
 {
-    /* Deliberately don't do the epicsThreadOnce() here; epicsThreadInit()
-     * is allowed to use stderr inside its once() routine, in which case we
-     * must return the OS's stderr instead. There may be a tiny chance of a
-     * race happening here during initialization for some architectures, so
-     * we only use it for stderr to reduce the chance of that happening.
-     */
-    if (!stderrThreadPrivateId)
-        return NULL;
+    epicsThreadOnce(&onceId,once,0);
     return epicsThreadPrivateGet(stderrThreadPrivateId);
 }
 

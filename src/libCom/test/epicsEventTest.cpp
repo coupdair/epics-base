@@ -47,8 +47,8 @@ static void consumer(void *arg)
 
     testDiag("consumer: starting");
     while (!pinfo->quit) {
-        epicsEventStatus status = epicsEventWait(pinfo->event);
-        if (status != epicsEventOK) {
+        epicsEventWaitStatus status = epicsEventWait(pinfo->event);
+        if (status != epicsEventWaitOK) {
             testDiag("consumer: epicsEventWait returned %d", status);
             errors++;
         }
@@ -101,7 +101,7 @@ static void producer(void *arg)
         }
         epicsMutexUnlock(pinfo->lockRing);
         epicsThreadSleep(1.0);
-        epicsEventMustTrigger(pinfo->event);
+        epicsEventSignal(pinfo->event);
     }
     testOk(errors == 0, "%s: errors = %d", name, errors);
 }
@@ -140,7 +140,7 @@ static void eventWakeupTest(void)
     epicsMutexUnlock(wp->countMutex);
     testOk(c == 0, "all threads still sleeping");
     for (i = 1 ; i <= SLEEPERCOUNT ; i++) {
-        epicsEventMustTrigger(wp->event);
+        epicsEventSignal(wp->event);
         epicsThreadSleep(0.5);
         epicsMutexLock(wp->countMutex);
         c = wp->count;
@@ -190,7 +190,7 @@ MAIN(epicsEventTest)
     epicsEventId event;
     int status;
 
-    testPlan(13+SLEEPERCOUNT);
+    testPlan(12+SLEEPERCOUNT);
 
     event = epicsEventMustCreate(epicsEventEmpty);
 
@@ -206,21 +206,19 @@ MAIN(epicsEventTest)
     testOk(status == epicsEventWaitTimeout,
         "epicsEventTryWait(event) = %d", status);
 
-    status = epicsEventTrigger(event);
-    testOk(status == epicsEventOK,
-        "epicsEventTrigger(event) = %d", status);
+    epicsEventSignal(event);
     status = epicsEventWaitWithTimeout(event, 1.0);
-    testOk(status == epicsEventOK,
+    testOk(status == epicsEventWaitOK,
         "epicsEventWaitWithTimeout(event, 1.0) = %d", status);
 
-    epicsEventMustTrigger(event);
+    epicsEventSignal(event);
     status = epicsEventWaitWithTimeout(event,DBL_MAX);
-    testOk(status == epicsEventOK,
+    testOk(status == epicsEventWaitOK,
         "epicsEventWaitWithTimeout(event, DBL_MAX) = %d", status);
 
-    epicsEventMustTrigger(event);
+    epicsEventSignal(event);
     status = epicsEventTryWait(event);
-    testOk(status == epicsEventOK,
+    testOk(status == epicsEventWaitOK,
         "epicsEventTryWait(event) = %d", status);
 
     info *pinfo = (info *)calloc(1,sizeof(info));
@@ -244,18 +242,11 @@ MAIN(epicsEventTest)
     pinfo->quit = 1;
     epicsThreadSleep(2.0);
 
-    epicsEventMustTrigger(pinfo->event);
+    epicsEventSignal(pinfo->event);
     epicsThreadSleep(1.0);
 
     eventWaitTest();
     eventWakeupTest();
-
-    free(name);
-    free(id);
-    epicsRingPointerDelete(pinfo->ring);
-    epicsMutexDestroy(pinfo->lockRing);
-    epicsEventDestroy(event);
-    free(pinfo);
 
     return testDone();
 }

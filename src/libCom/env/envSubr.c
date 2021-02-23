@@ -7,7 +7,7 @@
 * and higher are distributed subject to a Software License Agreement found
 * in file LICENSE that is included with this distribution. 
 \*************************************************************************/
-/*
+/*	Revision-Id: anj@aps.anl.gov-20101005192737-disfz3vs0f3fiixd
  *	Author:	Roger A. Cole
  *	Date:	07-20-91
  */
@@ -42,8 +42,7 @@
 
 #define epicsExportSharedSymbols
 #include "epicsStdlib.h"
-#include "epicsStdio.h"
-#include "epicsString.h"
+#include "epicsStdioRedirect.h"
 #include "errMdef.h"
 #include "errlog.h"
 #include "envDefs.h"
@@ -320,19 +319,7 @@ long	*pLong		/* O pointer to place to store value */
     }
     return -1;
 }
-
-
-long epicsShareAPI
-envGetBoolConfigParam(const ENV_PARAM *pParam, int *pBool)
-{
-    char text[20];
-
-    if(!envGetConfigParam(pParam, sizeof(text), text))
-        return -1;
-    *pBool = epicsStrCaseCmp(text, "yes")==0;
-    return 0;
-}
-
+
 /*+/subr**********************************************************************
 * NAME	envPrtConfigParam - print value of a configuration parameter
 *

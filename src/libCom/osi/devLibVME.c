@@ -9,6 +9,7 @@
 * in file LICENSE that is included with this distribution. 
 \*************************************************************************/
 /* devLib.c - support for allocation of common device resources */
+/* Revision-Id: anj@aps.anl.gov-20101005192737-disfz3vs0f3fiixd */
 
 /*
  *  Original Author: Marty Kraimer
@@ -18,6 +19,8 @@
  * NOTES:
  * .01  06-14-93    joh needs devAllocInterruptVector() routine
  */
+
+static const char sccsID[] = "@(#) Revision-Id: anj@aps.anl.gov-20101005192737-disfz3vs0f3fiixd";
 
 #include <string.h>
 #include <stdio.h>

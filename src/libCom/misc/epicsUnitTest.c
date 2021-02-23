@@ -5,7 +5,7 @@
 * in file LICENSE that is included with this distribution.
 \*************************************************************************/
 
-/*
+/* Revision-Id: anj@aps.anl.gov-20101005192737-disfz3vs0f3fiixd
  * Author: Andrew Johnson
  *
  * Unit test module which generates output in the Test Anything Protocol
@@ -23,7 +23,6 @@
 #include "epicsExit.h"
 #include "epicsTime.h"
 #include "ellLib.h"
-#include "errlog.h"
 #include "cantProceed.h"
 
 typedef struct {
@@ -74,7 +73,7 @@ int testOkV(int pass, const char *fmt, va_list pvar) {
     epicsMutexMustLock(testLock);
     tested++;
     if (pass) {
-	result += 4;    /* skip "not " */
+	result += 4;	/* skip "not " */
 	passed++;
 	if (todo)
 	    bonus++;
@@ -211,7 +210,7 @@ int testDone(void) {
 
 /* Our test harness, for RTEMS and vxWorks */
 
-void testHarnessExit(void *dummy) {
+static void harnessExit(void *dummy) {
     epicsTimeStamp ended;
     int Faulty;
 
@@ -248,7 +247,7 @@ void testHarnessExit(void *dummy) {
 
 void testHarness(void) {
     epicsThreadOnce(&onceFlag, testOnce, NULL);
-    epicsAtExit(testHarnessExit, NULL);
+    epicsAtExit(harnessExit, NULL);
     Harness = 1;
     Programs = 0;
     Tests = 0;

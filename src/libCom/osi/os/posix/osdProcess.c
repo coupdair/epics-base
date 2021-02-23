@@ -9,6 +9,8 @@
 \*************************************************************************/
 
 /* 
+ * Revision-Id: anj@aps.anl.gov-20101005192737-disfz3vs0f3fiixd
+ * 
  * Operating System Dependent Implementation of osiProcess.h
  *
  * Author: Jeff Hill
@@ -22,7 +24,6 @@
 #include <limits.h>
 #include <string.h>
 #include <unistd.h>
-#include <sched.h>
 #include <sys/types.h>
 #include <pwd.h>
 
@@ -62,7 +63,7 @@ epicsShareFunc osiSpawnDetachedProcessReturn epicsShareAPI osiSpawnDetachedProce
     (const char *pProcessName, const char *pBaseExecutableName)
 {
     int status;
-
+    
     /*
      * create a duplicate process
      */
@@ -73,16 +74,15 @@ epicsShareFunc osiSpawnDetachedProcessReturn epicsShareAPI osiSpawnDetachedProce
 
     /*
      * return to the caller
-     * in the initiating (parent) process
+     * if its in the initiating process
      */
     if (status) {
         return osiSpawnDetachedProcessSuccess;
     }
 
     /*
-     * This is executed only by the new child process.
-     * Close all open files except for STDIO, so they will not
-     * be inherited by the new program.
+     * close all open files except for STDIO so they will not
+     * be inherited by the spawned process.
      */
     {
         int fd, maxfd = sysconf ( _SC_OPEN_MAX );
@@ -94,20 +94,8 @@ epicsShareFunc osiSpawnDetachedProcessReturn epicsShareAPI osiSpawnDetachedProce
         }
     }
 
-#if defined(_POSIX_THREAD_PRIORITY_SCHEDULING) && _POSIX_THREAD_PRIORITY_SCHEDULING > 0
     /*
-     * Drop real-time SCHED_FIFO priority
-     */
-    {
-        struct sched_param p;
-
-        p.sched_priority = 0;
-        status = sched_setscheduler(0, SCHED_OTHER, &p);
-    }
-#endif /* _POSIX_THREAD_PRIORITY_SCHEDULING */
-
-    /*
-     * Run the specified executable
+     * overlay the specified executable
      */
     status = execlp (pBaseExecutableName, pBaseExecutableName, (char *)NULL);
     if ( status < 0 ) { 

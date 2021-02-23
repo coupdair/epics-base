@@ -7,12 +7,10 @@
 # and higher are distributed subject to a Software License Agreement found
 # in file LICENSE that is included with this distribution. 
 #*************************************************************************
-
+#--------------------------------------------------
 # GNU compiler defaults
 
 GNU = YES
-
-CMPLR_CLASS = gcc
 
 GNU_BIN = $(GNU_DIR)/bin
 GNU_LIB = $(GNU_DIR)/lib
@@ -50,12 +48,10 @@ STATIC_LDFLAGS_YES = -static
 STATIC_LDFLAGS_NO =
 
 SHRLIB_CFLAGS = -fPIC
-SHRLIB_LDFLAGS = -shared -fPIC
+SHRLIB_LDFLAGS =  -shared -fPIC
 LOADABLE_SHRLIB_LDFLAGS = -shared -fPIC
 
 GNU_LDLIBS_YES = -lgcc
 
-# Use compiler flags to generate header dependancies files
-HDEPENDS_METHOD = COMP
-HDEPENDS_COMPFLAGS = -MM -MF $@
-
+# Use GNU compiler flags to generate header dependancies files
+HDEPENDS_METHOD = CFLAGS

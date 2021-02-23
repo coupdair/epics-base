@@ -4,13 +4,10 @@
 * EPICS BASE is distributed subject to a Software License Agreement found
 * in file LICENSE that is included with this distribution.
 \*************************************************************************/
+// Revision-Id: anj@aps.anl.gov-20121203185826-cd68u8o9fu5vbr7u
 //	Author: Andrew Johnson
 
-#include <stdlib.h>
-#include <string.h>
-
 #include "epicsUnitTest.h"
-#include "epicsTypes.h"
 #include "epicsMath.h"
 #include "epicsAlgorithm.h"
 #include "postfix.h"
@@ -23,23 +20,17 @@ double doCalc(const char *expr) {
     double args[CALCPERFORM_NARGS] = {
 	1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0
     };
-    char *rpn = (char*)malloc(INFIX_TO_POSTFIX_SIZE(strlen(expr)+1));
+    char rpn[MAX_POSTFIX_SIZE];
     short err;
     double result = 0.0;
     result /= result;  /* Start as NaN */
-
-    if(!rpn) {
-        testAbort("postfix: %s no memory", expr);
-        return epicsNAN;
-    }
-
+    
     if (postfix(expr, rpn, &err)) {
 	testDiag("postfix: %s in expression '%s'", calcErrorStr(err), expr);
     } else
 	if (calcPerform(args, &result, rpn) && finite(result)) {
 	    testDiag("calcPerform: error evaluating '%s'", expr);
 	}
-    free(rpn);
     return result;
 }
 
@@ -47,114 +38,64 @@ void testCalc(const char *expr, double expected) {
     /* Evaluate expression, test against expected result */
     bool pass = false;
     double args[CALCPERFORM_NARGS] = {
-        1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0
+	1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0
     };
-    char *rpn = (char*)malloc(INFIX_TO_POSTFIX_SIZE(strlen(expr)+1));
+    char rpn[MAX_POSTFIX_SIZE];
     short err;
     double result = 0.0;
     result /= result;  /* Start as NaN */
-
-    if(!rpn) {
-        testFail("postfix: %s no memory", expr);
-        return;
-    }
-
+    
     if (postfix(expr, rpn, &err)) {
-        testDiag("postfix: %s in expression '%s'", calcErrorStr(err), expr);
+	testDiag("postfix: %s in expression '%s'", calcErrorStr(err), expr);
     } else
-        if (calcPerform(args, &result, rpn) && finite(result)) {
-            testDiag("calcPerform: error evaluating '%s'", expr);
-        }
-
+	if (calcPerform(args, &result, rpn) && finite(result)) {
+	    testDiag("calcPerform: error evaluating '%s'", expr);
+	}
+    
     if (finite(expected) && finite(result)) {
-        pass = fabs(expected - result) < 1e-8;
+	pass = fabs(expected - result) < 1e-8;
     } else if (isnan(expected)) {
-        pass = (bool) isnan(result);
+	pass = (bool) isnan(result);
     } else {
-        pass = (result == expected);
+	pass = (result == expected);
     }
     if (!testOk(pass, "%s", expr)) {
-        testDiag("Expected result is %g, actually got %g", expected, result);
-        calcExprDump(rpn);
+	testDiag("Expected result is %g, actually got %g", expected, result);
+	calcExprDump(rpn);
     }
-    free(rpn);
-}
-
-void testUInt32Calc(const char *expr, epicsUInt32 expected) {
-    /* Evaluate expression, test against expected result */
-    bool pass = false;
-    double args[CALCPERFORM_NARGS] = {
-        1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0
-    };
-    char *rpn = (char*)malloc(INFIX_TO_POSTFIX_SIZE(strlen(expr)+1));
-    short err;
-    epicsUInt32 uresult;
-    double result = 0.0;
-    result /= result;  /* Start as NaN */
-
-    if(!rpn) {
-        testFail("postfix: %s no memory", expr);
-        return;
-    }
-
-    if (postfix(expr, rpn, &err)) {
-        testDiag("postfix: %s in expression '%s'", calcErrorStr(err), expr);
-    } else
-        if (calcPerform(args, &result, rpn) && finite(result)) {
-            testDiag("calcPerform: error evaluating '%s'", expr);
-        }
-
-    uresult = (epicsUInt32) result;
-    pass = (uresult == expected);
-    if (!testOk(pass, "%s", expr)) {
-        testDiag("Expected result is 0x%x (%u), actually got 0x%x (%u)",
-                 expected, expected, uresult, uresult);
-        calcExprDump(rpn);
-    }
-    free(rpn);
+    return;
 }
 
 void testArgs(const char *expr, unsigned long einp, unsigned long eout) {
-    char *rpn = (char*)malloc(INFIX_TO_POSTFIX_SIZE(strlen(expr)+1));
+    char rpn[MAX_POSTFIX_SIZE];
     short err = 0;
     unsigned long vinp, vout;
 
-    if(!rpn) {
-        testFail("postfix: %s no memory", expr);
-        return;
-    }
-
     if (postfix(expr, rpn, &err)) {
-        testFail("postfix: %s in expression '%s'", calcErrorStr(err), expr);
-        return;
+	testFail("postfix: %s in expression '%s'", calcErrorStr(err), expr);
+	return;
     }
     if (calcArgUsage(rpn, &vinp, &vout)) {
-        testFail("calcArgUsage returned error for '%s'", expr);
-        return;
+	testFail("calcArgUsage returned error for '%s'", expr);
+	return;
     }
     if (!testOk(vinp == einp && vout == eout, "Args for '%s'", expr)) {
-        testDiag("Expected (%lx, %lx) got (%lx, %lx)", einp, eout, vinp, vout);
+	testDiag("Expected (%lx, %lx) got (%lx, %lx)", einp, eout, vinp, vout);
     }
-    free(rpn);
 }
 
 void testBadExpr(const char *expr, short expected_err) {
     /* Parse an invalid expression, test against expected error code */
-    char *rpn = (char*)malloc(INFIX_TO_POSTFIX_SIZE(strlen(expr)+1));
+    char rpn[MAX_POSTFIX_SIZE];
     short err = 0;
-
-    if(!rpn) {
-        testFail("postfix: %s no memory", expr);
-        return;
-    }
 
     postfix(expr, rpn, &err);
     if (!testOk(err == expected_err, "Bad expression '%s'", expr)) {
-        testDiag("Expected '%s', actually got '%s'",
-                 calcErrorStr(expected_err), calcErrorStr(err));
-        calcExprDump(rpn);
+	testDiag("Expected '%s', actually got '%s'",
+	    calcErrorStr(expected_err), calcErrorStr(err));
+	calcExprDump(rpn);
     }
-    free(rpn);
+    return;
 }
 
 /* Test an expression that is also valid C code */
@@ -297,8 +238,8 @@ MAIN(epicsCalcTest)
     const double a=1.0, b=2.0, c=3.0, d=4.0, e=5.0, f=6.0,
 		 g=7.0, h=8.0, i=9.0, j=10.0, k=11.0, l=12.0;
     
-    testPlan(613);
-
+    testPlan(577);
+    
     /* LITERAL_OPERAND elements */
     testExpr(0);
     testExpr(1);
@@ -370,7 +311,7 @@ MAIN(epicsCalcTest)
     testExpr(exp(1.));
     testExpr(floor(1.5));
 
-    testExpr(finite(0.));
+    testExpr(finite(0));
     testExpr(finite(Inf));
     testExpr(finite(-Inf));
     testExpr(finite(NaN));
@@ -384,11 +325,11 @@ MAIN(epicsCalcTest)
     testCalc("finite(0,1,-Inf)", 0);
     testCalc("finite(0,-Inf,2)", 0);
     testCalc("finite(-Inf,1,2)", 0);
-    testExpr(isinf(0.));
+    testExpr(isinf(0));
     testExpr(isinf(Inf));
     testExpr(!!isinf(-Inf));    // Some GCCs return -1/0/+1 rather than 0/+1
     testExpr(isinf(NaN));
-    testExpr(isnan(0.));
+    testExpr(isnan(0));
     testExpr(isnan(Inf));
     testExpr(isnan(-Inf));
     testExpr(isnan(NaN));
@@ -466,8 +407,8 @@ MAIN(epicsCalcTest)
     testExpr(MAX( 1., 2.,Inf, 4., 5., 3.));
     testExpr(MAX( 1.,Inf, 3., 4., 5., 2.));
     testExpr(MAX(Inf, 2., 3., 4., 5., 1.));
-    testExpr(MAX(1,2,3,4,5,6,7,8,9,10,11,12));
-    testExpr(MAX(5,4,3,2,1,0,-1,-2,-3,-4,-5,-6));
+    testExpr(MAX(1,2,3,4,5,6,7,8,9,10));
+    testExpr(MAX(5,4,3,2,1,0,-1,-2,-3,-4));
     testExpr(MAX(-1,1,0));
 
     testExpr(MIN(99));
@@ -527,8 +468,8 @@ MAIN(epicsCalcTest)
     testExpr(MIN( 1., 2.,-Inf, 4., 5., 3.));
     testExpr(MIN( 1.,-Inf, 3., 4., 5., 2.));
     testExpr(MIN(-Inf, 2., 3., 4., 5., 1.));
-    testExpr(MIN(1,2,3,4,5,6,7,8,9,10,11,12));
-    testExpr(MIN(5,4,3,2,1,0,-1,-2,-3,-4,-5,-6));
+    testExpr(MIN(1,2,3,4,5,6,7,8,9,10));
+    testExpr(MIN(5,4,3,2,1,0,-1,-2,-3,-4));
     testExpr(MIN(1,-1,0));
     testExpr(MAX(MIN(0,2),MAX(0),MIN(3,2,1)));
 
@@ -612,18 +553,10 @@ MAIN(epicsCalcTest)
     testExpr(0.0 + NaN);
     testExpr(Inf + 0.0);
     testExpr(Inf + Inf);
-#if defined(_WIN64) && defined(_MSC_VER)
-    testCalc("Inf + -Inf", NaN);
-#else
     testExpr(Inf + -Inf);
-#endif
     testExpr(Inf + NaN);
     testExpr(-Inf + 0.0);
-#if defined(_WIN64) && defined(_MSC_VER)
-    testCalc("-Inf + Inf", NaN);
-#else
     testExpr(-Inf + Inf);
-#endif
     testExpr(-Inf + -Inf);
     testExpr(-Inf + NaN);
     testExpr(NaN + 0.0);
@@ -942,51 +875,7 @@ MAIN(epicsCalcTest)
     testBadExpr("1?", CALC_ERR_CONDITIONAL);
     testBadExpr("1?1", CALC_ERR_CONDITIONAL);
     testBadExpr(":1", CALC_ERR_SYNTAX);
-
-    // Bit manipulations wrt bit 31 (bug lp:1514520)
-    //   using integer literals
-    testUInt32Calc("0xaaaaaaaa AND 0xffff0000", 0xaaaa0000u);
-    testUInt32Calc("0xaaaaaaaa OR 0xffff0000", 0xffffaaaau);
-    testUInt32Calc("0xaaaaaaaa XOR 0xffff0000", 0x5555aaaau);
-    testUInt32Calc("~0xaaaaaaaa", 0x55555555u);
-    testUInt32Calc("~~0xaaaaaaaa", 0xaaaaaaaau);
-    testUInt32Calc("0xaaaaaaaa >> 8", 0xffaaaaaau);
-    testUInt32Calc("0xaaaaaaaa << 8", 0xaaaaaa00u);
-    //   using integer literals assigned to variables
-    testUInt32Calc("a:=0xaaaaaaaa; b:=0xffff0000; a AND b", 0xaaaa0000u);
-    testUInt32Calc("a:=0xaaaaaaaa; b:=0xffff0000; a OR b", 0xffffaaaau);
-    testUInt32Calc("a:=0xaaaaaaaa; b:=0xffff0000; a XOR b", 0x5555aaaau);
-    testUInt32Calc("a:=0xaaaaaaaa; ~a", 0x55555555u);
-    testUInt32Calc("a:=0xaaaaaaaa; ~~a", 0xaaaaaaaau);
-    testUInt32Calc("a:=0xaaaaaaaa; a >> 8", 0xffaaaaaau);
-    testUInt32Calc("a:=0xaaaaaaaa; a << 8", 0xaaaaaa00u);
-
-    // Test proper conversion of double values (+ 0.1 enforces double literal)
-    // when used as inputs to the bitwise operations.
-    //      0xaaaaaaaa = -1431655766 or 2863311530u
-    testUInt32Calc("-1431655766.1 OR 0", 0xaaaaaaaau);
-    testUInt32Calc("2863311530.1 OR 0", 0xaaaaaaaau);
-    testUInt32Calc("0 OR -1431655766.1", 0xaaaaaaaau);
-    testUInt32Calc("0 OR 2863311530.1", 0xaaaaaaaau);
-    testUInt32Calc("-1431655766.1 XOR 0", 0xaaaaaaaau);
-    testUInt32Calc("2863311530.1 XOR 0", 0xaaaaaaaau);
-    testUInt32Calc("0 XOR -1431655766.1", 0xaaaaaaaau);
-    testUInt32Calc("0 XOR 2863311530.1", 0xaaaaaaaau);
-    testUInt32Calc("-1431655766.1 AND 0xffffffff", 0xaaaaaaaau);
-    testUInt32Calc("2863311530.1 AND 0xffffffff", 0xaaaaaaaau);
-    testUInt32Calc("0xffffffff AND -1431655766.1", 0xaaaaaaaau);
-    testUInt32Calc("0xffffffff AND 2863311530.1", 0xaaaaaaaau);
-    testUInt32Calc("~ -1431655766.1", 0x55555555u);
-    testUInt32Calc("~ 2863311530.1", 0x55555555u);
-    testUInt32Calc("-1431655766.1 >> 0", 0xaaaaaaaau);
-    testUInt32Calc("2863311530.1 >> 0", 0xaaaaaaaau);
-    testUInt32Calc("-1431655766.1 >> 0.1", 0xaaaaaaaau);
-    testUInt32Calc("2863311530.1 >> 0.1", 0xaaaaaaaau);
-    testUInt32Calc("-1431655766.1 << 0", 0xaaaaaaaau);
-    testUInt32Calc("2863311530.1 << 0", 0xaaaaaaaau);
-    testUInt32Calc("-1431655766.1 << 0.1", 0xaaaaaaaau);
-    testUInt32Calc("2863311530.1 << 0.1", 0xaaaaaaaau);
-
+    
     return testDone();
 }
 

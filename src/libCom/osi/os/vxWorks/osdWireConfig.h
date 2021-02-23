@@ -9,7 +9,6 @@
 #ifndef osdWireConfig_h
 #define osdWireConfig_h
 
-#include <vxWorks.h>
 #include <types/vxArch.h>
 
 #if _BYTE_ORDER == _LITTLE_ENDIAN

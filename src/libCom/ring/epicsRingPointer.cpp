@@ -3,16 +3,11 @@
 *     National Laboratory.
 * Copyright (c) 2002 The Regents of the University of California, as
 *     Operator of Los Alamos National Laboratory.
-* Copyright (c) 2012 ITER Organization.
 * EPICS BASE is distributed subject to a Software License Agreement found
 * in file LICENSE that is included with this distribution.
 \*************************************************************************/
-
-/*
- * Author:  Marty Kraimer Date:    13OCT2000
- *          Ralph Lange <Ralph.Lange@gmx.de>
- */
-
+/*epicsRingPointer.cpp*/
+/* Author:  Marty Kraimer Date:    13OCT2000 */
 
 #include <stddef.h>
 #include <string.h>
@@ -27,13 +22,7 @@ typedef epicsRingPointer<void> voidPointer;
 
 epicsShareFunc epicsRingPointerId  epicsShareAPI epicsRingPointerCreate(int size)
 {
-    voidPointer *pvoidPointer = new voidPointer(size, false);
-    return(reinterpret_cast<void *>(pvoidPointer));
-}
-
-epicsShareFunc epicsRingPointerId  epicsShareAPI epicsRingPointerLockedCreate(int size)
-{
-    voidPointer *pvoidPointer = new voidPointer(size, true);
+    voidPointer *pvoidPointer = new voidPointer(size);
     return(reinterpret_cast<void *>(pvoidPointer));
 }
 

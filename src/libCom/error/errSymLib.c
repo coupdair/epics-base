@@ -7,11 +7,11 @@
 * and higher are distributed subject to a Software License Agreement found
 * in file LICENSE that is included with this distribution. 
 \*************************************************************************/
-/*
+/* Revision-Id: anj@aps.anl.gov-20101005192737-disfz3vs0f3fiixd
  * errSymLib.c
  *      Author:          Marty Kraimer
  *      Date:            6-1-90
- *
+ * errMessage.c - Handle error messages 
  ***************************************************************************
  * This must ultimately be replaced by a facility that allows remote
  * nodes access to the error messages. A message handling communication
@@ -192,9 +192,11 @@ static void errRawCopy ( long statusToDecode, char *pBuf, unsigned bufLength )
         assert ( nChar < bufLength );
     }
 }
-
-static
-const char* errSymLookupInternal(long status)
+
+/****************************************************************
+ * errSymLookup
+ ***************************************************************/
+void epicsShareAPI errSymLookup (long status, char * pBuf, unsigned bufLength)
 {
     unsigned modNum;
     unsigned hashInd;
@@ -209,7 +211,9 @@ const char* errSymLookupInternal(long status)
     if ( modNum <= 500 ) {
         const char * pStr = strerror ((int) status);
         if ( pStr ) {
-            return pStr;
+            strncpy(pBuf, pStr,bufLength);
+            pBuf[bufLength-1] = '\0';
+            return;
         }
     }
     else {
@@ -218,35 +222,17 @@ const char* errSymLookupInternal(long status)
         pNextNode = *phashnode;
         while(pNextNode) {
             if(pNextNode->errNum==status){
-                return pNextNode->message;
+                strncpy(pBuf, pNextNode->message, bufLength);
+                pBuf[bufLength-1] = '\0';
+                return;
             }
             phashnode = &pNextNode->hashnode;
             pNextNode = *phashnode;
         }
     }
-    return NULL;
-}
-
-const char* errSymMsg(long status)
-{
-    const char* msg = errSymLookupInternal(status);
-    return msg ? msg : "<Unknown code>";
-}
-
-/****************************************************************
- * errSymLookup
- ***************************************************************/
-void epicsShareAPI errSymLookup (long status, char * pBuf, unsigned bufLength)
-{
-    const char* msg = errSymLookupInternal(status);
-    if(msg) {
-        strncpy(pBuf, msg, bufLength);
-        pBuf[bufLength-1] = '\0';
-        return;
-    }
     errRawCopy(status, pBuf, bufLength);
 }
-
+
 /****************************************************************
  * errSymDump
  ***************************************************************/

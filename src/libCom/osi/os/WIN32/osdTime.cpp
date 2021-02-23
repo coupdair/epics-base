@@ -8,16 +8,19 @@
 \*************************************************************************/
 
 //
+// Revision-Id: anj@aps.anl.gov-20111129200729-1bx6zsmjnog13sf0
+//
 // Author: Jeff Hill
+//
 //
 
 //
 // ANSI C
 //
-#include <cmath>
-#include <ctime>
-#include <climits>
-#include <cstdio>
+#include <math.h>
+#include <time.h>
+#include <limits.h>
+#include <stdio.h>
 
 //
 // WIN32
@@ -25,7 +28,6 @@
 #define VC_EXTRALEAN
 #define STRICT
 #include <windows.h>
-#include <process.h>
 
 //
 // EPICS
@@ -44,26 +46,28 @@
 #   define debugPrintf(argsInParen)
 #endif
 
-extern "C" void setThreadName ( DWORD dwThreadID, LPCSTR szThreadName );
-
 static int osdTimeGetCurrent ( epicsTimeStamp *pDest );
+
+// GNU seems to require that 64 bit constants have LL on
+// them. The borland compiler fails to compile constants
+// with the LL suffix. MS compiler doesnt care.
+#ifdef __GNUC__
+#define LL_CONSTANT(VAL) VAL ## LL
+#else
+#define LL_CONSTANT(VAL) VAL
+#endif
 
 // for mingw
 #if !defined ( MAXLONGLONG )
-#   define MAXLONGLONG 0x7fffffffffffffffLL
+#define MAXLONGLONG LL_CONSTANT(0x7fffffffffffffff)
 #endif
 #if !defined ( MINLONGLONG )
-#   define MINLONGLONG ~0x7fffffffffffffffLL
-#endif
-#ifndef STACK_SIZE_PARAM_IS_A_RESERVATION
-#   define STACK_SIZE_PARAM_IS_A_RESERVATION 0x00010000
+#define MINLONGLONG LL_CONSTANT(~0x7fffffffffffffff)
 #endif
 
-static const LONGLONG epicsEpochInFileTime = 0x01b41e2a18d64000LL;
+static const LONGLONG epicsEpochInFileTime = LL_CONSTANT(0x01b41e2a18d64000);
 
-static unsigned __stdcall _pllThreadEntry ( void * pCurrentTimeIn );
-
-class currentTime {
+class currentTime : public epicsTimerNotify {
 public:
     currentTime ();
     ~currentTime ();
@@ -77,24 +81,20 @@ private:
     LONGLONG perfCounterFreqPLL;
     LONGLONG lastPerfCounterPLL;
     LONGLONG lastFileTimePLL;
-    HANDLE threadHandle;
-    unsigned threadId;
+    epicsTimerQueueActive * pTimerQueue;
+    epicsTimer * pTimer;
     bool perfCtrPresent;
-    bool threadShutdownCmd;
-    bool threadHasExited;
-    void updatePLL ();
     static const int pllDelay; /* integer seconds */
-    // cant be static because of diff btw __stdcall and __cdecl 
-    friend unsigned __stdcall _pllThreadEntry ( void * pCurrentTimeIn );
+    epicsTimerNotify::expireStatus expire ( const epicsTime & );
 };
-
-const int currentTime :: pllDelay = 5;
 
 static currentTime * pCurrentTime = 0;
 static const LONGLONG FILE_TIME_TICKS_PER_SEC = 10000000;
 static const LONGLONG EPICS_TIME_TICKS_PER_SEC = 1000000000;
 static const LONGLONG ET_TICKS_PER_FT_TICK =
             EPICS_TIME_TICKS_PER_SEC / FILE_TIME_TICKS_PER_SEC;
+
+const int currentTime :: pllDelay = 5;
     
 //
 // Start and register time provider
@@ -121,31 +121,148 @@ static int osdTimeGetCurrent ( epicsTimeStamp *pDest )
     return epicsTimeOK;
 }
 
+inline void UnixTimeToFileTime ( const time_t * pAnsiTime, LPFILETIME pft )
+{
+     LONGLONG ll = Int32x32To64 ( *pAnsiTime, 10000000 ) + LL_CONSTANT(116444736000000000);
+     pft->dwLowDateTime = static_cast < DWORD > ( ll );
+     pft->dwHighDateTime = static_cast < DWORD > ( ll >>32 );
+}
+
+static int daysInMonth[] = { 31, 28, 31, 30, 31, 30, 31,
+    31, 30, 31, 30, 31 };
+
+static bool isLeapYear ( DWORD year )
+{
+    if ( (year % 4) == 0 ) {
+        return ( ( year % 100 ) != 0 || ( year % 400 ) == 0 );
+    } else {
+        return false;
+    }
+}
+
+static int dayOfYear ( DWORD day, DWORD month, DWORD year )
+{
+    DWORD nDays = 0;
+    for ( unsigned m = 1; m < month; m++ ) {
+        nDays += daysInMonth[m-1];
+        if ( m == 2 && isLeapYear(year) ) {
+            nDays++;
+        }
+    }
+    return nDays + day;
+}
+
 // synthesize a reentrant gmtime on WIN32
 int epicsShareAPI epicsTime_gmtime ( const time_t *pAnsiTime, struct tm *pTM )
 {
-    struct tm * pRet = gmtime ( pAnsiTime );
-    if ( pRet ) {
-        *pTM = *pRet;
-        return epicsTimeOK;
+    FILETIME ft;
+    UnixTimeToFileTime ( pAnsiTime, &ft );
+
+    SYSTEMTIME st;
+    BOOL status = FileTimeToSystemTime ( &ft, &st );
+    if ( ! status ) {
+        return epicsTimeERROR;
     }
-    else {
-        return errno;
-    }
+
+    pTM->tm_sec = st.wSecond; // seconds after the minute - [0,59]
+    pTM->tm_min = st.wMinute; // minutes after the hour - [0,59]
+    pTM->tm_hour = st.wHour; // hours since midnight - [0,23]
+    assert ( st.wDay >= 1 && st.wDay <= 31 );
+    pTM->tm_mday = st.wDay; // day of the month - [1,31]
+    assert ( st.wMonth >= 1 && st.wMonth <= 12 );
+    pTM->tm_mon = st.wMonth - 1; // months since January - [0,11]
+    assert ( st.wYear >= 1900 );
+    pTM->tm_year = st.wYear - 1900; // years since 1900
+    pTM->tm_wday = st.wDayOfWeek; // days since Sunday - [0,6]
+    pTM->tm_yday = dayOfYear ( st.wDay, st.wMonth, st.wYear ) - 1;
+    pTM->tm_isdst = 0;
+
+    return epicsTimeOK;
 }
 
 // synthesize a reentrant localtime on WIN32
 int epicsShareAPI epicsTime_localtime (
     const time_t * pAnsiTime, struct tm * pTM )
 {
-    struct tm * pRet = localtime ( pAnsiTime );
-    if ( pRet ) {
-        *pTM = *pRet;
-        return epicsTimeOK;
+    FILETIME ft;
+    UnixTimeToFileTime ( pAnsiTime, & ft );
+
+    TIME_ZONE_INFORMATION tzInfo;
+    DWORD tzStatus = GetTimeZoneInformation ( & tzInfo );
+    if ( tzStatus == TIME_ZONE_ID_INVALID ) {
+        return epicsTimeERROR;
     }
-    else {
-        return errno;
+
+    //
+    // There are remarkable weaknessess in the FileTimeToLocalFileTime
+    // interface so we dont use it here. Unfortunately, there is no
+    // corresponding function that works on file time.
+    //
+    SYSTEMTIME st;
+    BOOL success = FileTimeToSystemTime ( & ft, & st );
+    if ( ! success ) {
+        return epicsTimeERROR;
     }
+    SYSTEMTIME lst;
+    success = SystemTimeToTzSpecificLocalTime (
+        & tzInfo, & st, & lst );
+    if ( ! success ) {
+        return epicsTimeERROR;
+    }
+
+    //
+    // We must convert back to file time so that we can determine if DST
+    // is active...
+    //
+    FILETIME lft;
+    success = SystemTimeToFileTime ( & lst, & lft );
+    if ( ! success ) {
+        return epicsTimeERROR;
+    }
+
+    int is_dst = -1; // unknown state of dst
+    if ( tzStatus != TIME_ZONE_ID_UNKNOWN &&
+            tzInfo.StandardDate.wMonth != 0 &&
+            tzInfo.DaylightDate.wMonth != 0) {
+        // determine if the specified date is
+        // in daylight savings time
+        tzInfo.StandardDate.wYear = st.wYear;
+        FILETIME StandardDateFT;
+        success = SystemTimeToFileTime (
+            & tzInfo.StandardDate, & StandardDateFT );
+        if ( ! success ) {
+            return epicsTimeERROR;
+        }
+        tzInfo.DaylightDate.wYear = st.wYear;
+        FILETIME DaylightDateFT;
+        success = SystemTimeToFileTime (
+            & tzInfo.DaylightDate, & DaylightDateFT );
+        if ( ! success ) {
+            return epicsTimeERROR;
+        }
+        if ( CompareFileTime ( & lft, & DaylightDateFT ) >= 0
+                && CompareFileTime ( & lft, & StandardDateFT ) < 0 ) {
+            is_dst = 1;
+        }
+        else {
+            is_dst = 0;
+        }
+    }
+
+    pTM->tm_sec = lst.wSecond; // seconds after the minute - [0,59]
+    pTM->tm_min = lst.wMinute; // minutes after the hour - [0,59]
+    pTM->tm_hour = lst.wHour; // hours since midnight - [0,23]
+    assert ( lst.wDay >= 1 && lst.wDay <= 31 );
+    pTM->tm_mday = lst.wDay; // day of the month - [1,31]
+    assert ( lst.wMonth >= 1 && lst.wMonth <= 12 );
+    pTM->tm_mon = lst.wMonth - 1; // months since January - [0,11]
+    assert ( lst.wYear >= 1900 );
+    pTM->tm_year = lst.wYear - 1900; // years since 1900
+    pTM->tm_wday = lst.wDayOfWeek; // days since Sunday - [0,6]
+    pTM->tm_yday = dayOfYear ( lst.wDay, lst.wMonth, lst.wYear ) - 1;
+    pTM->tm_isdst = is_dst;
+
+    return epicsTimeOK;
 }
 
 currentTime::currentTime () :
@@ -155,11 +272,9 @@ currentTime::currentTime () :
     perfCounterFreqPLL ( 0 ),
     lastPerfCounterPLL ( 0 ),
     lastFileTimePLL ( 0 ),
-    threadHandle ( 0 ),
-    threadId ( 0 ),
-    perfCtrPresent ( false ),
-    threadShutdownCmd ( false ),
-    threadHasExited ( false )
+    pTimerQueue ( 0 ),
+    pTimer ( 0 ),
+    perfCtrPresent ( false )
 {
     InitializeCriticalSection ( & this->mutex );
 
@@ -202,34 +317,15 @@ currentTime::currentTime () :
     this->lastFileTimePLL = liFileTime.QuadPart;
 }
 
-void currentTime :: startPLL ()
-{
-    // create frequency estimation thread when needed
-    if ( this->perfCtrPresent && ! this->threadHandle ) {
-        this->threadHandle = (HANDLE) 
-            _beginthreadex ( 0, 4096, _pllThreadEntry, this,
-                CREATE_SUSPENDED | STACK_SIZE_PARAM_IS_A_RESERVATION, 
-                & this->threadId );
-        assert ( this->threadHandle );
-        BOOL bstat = SetThreadPriority ( 
-        	this->threadHandle, THREAD_PRIORITY_HIGHEST );
-        assert ( bstat );
-        DWORD wstat =  ResumeThread ( this->threadHandle );
-        assert ( wstat != 0xFFFFFFFF );
-    }
-}
-
 currentTime::~currentTime ()
 {
-    EnterCriticalSection ( & this->mutex );
-    this->threadShutdownCmd = true;
-    while ( ! this->threadHasExited ) {
-        LeaveCriticalSection ( & this->mutex );
-        Sleep ( 250 /* mS */ );
-        EnterCriticalSection ( & this->mutex );
-    }
-    LeaveCriticalSection ( & this->mutex );
     DeleteCriticalSection ( & this->mutex );
+    if ( this->pTimer ) {
+        this->pTimer->destroy ();
+    }
+    if ( this->pTimerQueue ) {
+        this->pTimerQueue->release ();
+    }
 }
 
 void currentTime::getCurrentTime ( epicsTimeStamp & dest )
@@ -270,7 +366,7 @@ void currentTime::getCurrentTime ( epicsTimeStamp & dest )
         LONGLONG epicsTimeCurrent = this->epicsTimeLast + offset;
         if ( this->epicsTimeLast > epicsTimeCurrent ) {
             double diff = static_cast < double >
-                ( this->epicsTimeLast - epicsTimeCurrent ) / EPICS_TIME_TICKS_PER_SEC;
+                ( this->epicsTimeLast - epicsTimeCurrent );
             errlogPrintf (
                 "currentTime::getCurrentTime(): %f sec "
                 "time discontinuity detected\n",
@@ -299,7 +395,7 @@ void currentTime::getCurrentTime ( epicsTimeStamp & dest )
 // Maintain corrected version of the performance counter's frequency using
 // a phase locked loop. This approach is similar to NTP's.
 //
-void currentTime :: updatePLL ()
+epicsTimerNotify::expireStatus currentTime::expire ( const epicsTime & )
 {
     EnterCriticalSection ( & this->mutex );
 
@@ -344,7 +440,7 @@ void currentTime :: updatePLL ()
     if ( fileTimeDiff <= 0 ) {
         LeaveCriticalSection( & this->mutex );
         debugPrintf ( ( "currentTime: file time difference in PLL was less than zero\n" ) );
-        return;
+        return expireStatus ( restart, pllDelay /* sec */ );
     }
 
     LONGLONG freq = ( FILE_TIME_TICKS_PER_SEC * perfCounterDiff ) / fileTimeDiff;
@@ -358,7 +454,7 @@ void currentTime :: updatePLL ()
             static_cast < int > ( -bound ),
             static_cast < int > ( delta ),
             static_cast < int > ( bound ) ) );
-        return;
+        return expireStatus ( restart, pllDelay /* sec */ );
     }
 
     // update feedback loop estimating the performance counter's frequency
@@ -395,7 +491,7 @@ void currentTime :: updatePLL ()
             debugPrintf ( ( "perf ctr measured delay out of bounds m=%d max=%d\n",               
                 static_cast < int > ( perfCounterDiffSinceLastFetch ),
                 static_cast < int > ( expectedDly + bnd ) ) );
-            return;
+            return expireStatus ( restart, pllDelay /* sec */ );
         }
     }
 
@@ -434,9 +530,9 @@ void currentTime :: updatePLL ()
 
     delta = epicsTimeFromCurrentFileTime - this->epicsTimeLast;
     if ( delta > EPICS_TIME_TICKS_PER_SEC || delta < -EPICS_TIME_TICKS_PER_SEC ) {
-        // When there is an abrupt shift in the current computed time vs 
-        // the time derived from the current file time then someone has 
-        // probably adjusted the real time clock and the best reaction 
+        // When there is an abrupt shift in the current computed time vs
+        // the time derived from the current file time then someone has
+        // probabably adjusted the real time clock and the best reaction
         // is to just assume the new time base
         this->epicsTimeLast = epicsTimeFromCurrentFileTime;
         this->perfCounterFreq = this->perfCounterFreqPLL;
@@ -476,31 +572,24 @@ void currentTime :: updatePLL ()
                 ( this->perfCounterFreqPLL - sysFreq.QuadPart );
             freqEstDiff /= sysFreq.QuadPart;
             freqEstDiff *= 100.0;
-            debugPrintf ( ( "currentTime: freq delta %f %% freq est "
-                "delta %f %% time delta %f sec\n", 
-                freqDiff, 
-                freqEstDiff, 
-                static_cast < double > ( delta ) / 
-                        EPICS_TIME_TICKS_PER_SEC ) );
+            debugPrintf ( ( "currentTime: freq delta %f %% freq est delta %f %% time delta %f sec\n",
+                freqDiff, freqEstDiff, static_cast < double > ( delta ) / EPICS_TIME_TICKS_PER_SEC ) );
 #       endif
     }
 
     LeaveCriticalSection ( & this->mutex );
+
+    return expireStatus ( restart, pllDelay /* sec */ );
 }
 
-static unsigned __stdcall _pllThreadEntry ( void * pCurrentTimeIn )
+void currentTime::startPLL ()
 {
-    currentTime * pCT = 
-        reinterpret_cast < currentTime * > ( pCurrentTimeIn );
-    setThreadName ( pCT->threadId, "EPICS Time PLL" );
-    while ( ! pCT->threadShutdownCmd ) {
-        Sleep ( currentTime :: pllDelay * 1000 /* mS */ );
-        pCT->updatePLL ();
+    // create frequency estimation timer when needed
+    if ( this->perfCtrPresent && ! this->pTimerQueue ) {
+        this->pTimerQueue = & epicsTimerQueueActive::allocate ( true );
+        this->pTimer      = & this->pTimerQueue->createTimer ();
+        this->pTimer->start ( *this, pllDelay );
     }
-    EnterCriticalSection ( & pCT->mutex );
-    pCT->threadHasExited = true;
-    LeaveCriticalSection ( & pCT->mutex );
-    return 1;
 }
 
 epicsTime::operator FILETIME () const

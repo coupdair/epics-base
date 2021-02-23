@@ -1,32 +1,43 @@
 #!/usr/bin/env perl
 #*************************************************************************
-# Copyright (c) 2014 UChicago Argonne LLC, as Operator of Argonne
+# Copyright (c) 2002 The University of Chicago, as Operator of Argonne
 #     National Laboratory.
-# EPICS BASE is distributed subject to a Software License Agreement found
+# Copyright (c) 2002 The Regents of the University of California, as
+#     Operator of Los Alamos National Laboratory.
+# EPICS BASE Versions 3.13.7
+# and higher are distributed subject to a Software License Agreement found
 # in file LICENSE that is included with this distribution. 
 #*************************************************************************
+#
+# Revision-Id: anj@aps.anl.gov-20130123132907-fi34uue1k4b3kig8
 
-use strict;
 use File::Basename;
 
-sub Usage {
-    my $txt = shift;
+sub Usage
+{
+	my ($txt) = @_;
 
-    print "Usage: makeIncludeDbd.pl input file list ... outfile\n";
-    print "Error: $txt\n" if $txt;
-    exit 2;
+	print "Usage:\n";
+	print "\tmakeIncludeDbd.pl infile1 [ infile2 infile3 ...] outfile\n";
+	print "\nError: $txt\n" if $txt;
+
+	exit 2;
 }
 
-Usage("No input files specified")
-    unless $#ARGV > 1;
+# need at least two args: ARGV[0] and ARGV[1]
+Usage("\"makeIncludeDbd.pl @ARGV\": No input files specified") if $#ARGV < 1;
 
-my $target = pop @ARGV;
-my @inputs = map { basename($_); } @ARGV;
+$target=$ARGV[$#ARGV];
+@sources=@ARGV[0..$#ARGV-1];
 
-open(my $OUT, '>', $target)
-    or die "$0: Can't create $target, $!\n";
+open(OUT, "> $target") or die "Cannot create $target\n";;
+foreach $file ( @sources )
+{
+	$base=basename($file);
+	print OUT "include \"$base\"\n";
+}
 
-print $OUT "# Generated file $target\n\n";
-print $OUT map { "include \"$_\"\n"; } @inputs;
+close OUT;
 
-close $OUT;
+#   EOF makeIncludeDbd.pl
+

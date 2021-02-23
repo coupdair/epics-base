@@ -81,11 +81,7 @@ static void thread(void *arg)
 
 MAIN(epicsThreadTest)
 {
-    testPlan(9);
-
-    unsigned int ncpus = epicsThreadGetCPUs();
-    testDiag("System has %u CPUs", ncpus);
-    testOk1(ncpus > 0);
+    testPlan(8);
 
     const int ntasks = 3;
     myThread *myThreads[ntasks];

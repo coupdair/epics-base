@@ -5,7 +5,7 @@
 # in file LICENSE that is included with this distribution.
 #*************************************************************************
 
-use Carp;
+# Revision-Id: anj@aps.anl.gov-20101005192737-disfz3vs0f3fiixd
 
 # Copy directories and files from a template
 
@@ -15,7 +15,7 @@ sub copyTree {
     # $Rtextsubs contains substitutions for file content.
 
     opendir my $FILES, $src
-        or croak "opendir failed while copying $src: $!\n";
+        or die "opendir failed while copying $src: $!\n";
     my @entries = readdir $FILES;
     closedir $FILES;
 
@@ -36,9 +36,9 @@ sub copyTree {
             print "." unless $opt_d;
             copyFile($srcName, $dstName, $Rtextsubs);
         } elsif (-l $srcName) {
-            carp "\nSoft link in template, ignored:\n\t$srcName\n";
+            warn "\nSoft link in template, ignored:\n\t$srcName\n";
         } else {
-            carp "\nUnknown file type in template, ignored:\n\t$srcName\n";
+            warn "\nUnknown file type in template, ignored:\n\t$srcName\n";
         }
     }
 }
@@ -46,11 +46,11 @@ sub copyTree {
 sub copyDir {
     my ($src, $dst, $Rnamesubs, $Rtextsubs) = @_;
     if (-e $dst && ! -d $dst) {
-        carp "\nTarget exists but is not a directory, skipping:\n\t$dst\n";
+        warn "\nTarget exists but is not a directory, skipping:\n\t$dst\n";
         return;
     }
     print "Creating directory '$dst'\n" if $opt_d;
-    mkdir $dst, 0777 or croak "Can't create $dst: $!\n"
+    mkdir $dst, 0777 or die "Can't create $dst: $!\n"
         unless -d $dst;
     copyTree($src, $dst, $Rnamesubs, $Rtextsubs);
 }
@@ -61,7 +61,7 @@ sub copyFile {
     print "Creating file '$dst'\n" if $opt_d;
     open(my $SRC, '<', $src)
         and open(my $DST, '>', $dst)
-        or croak "$! copying $src to $dst\n";
+        or die "$! copying $src to $dst\n";
     while (<$SRC>) {
         # Substitute any @VARS@ in the text
         s{@(\w+?)@}

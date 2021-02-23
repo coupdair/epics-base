@@ -59,18 +59,10 @@ static void thread(void *arg)
     testDiag("%s starting", pinfo->name);
     pinfo->terminate = epicsEventMustCreate(epicsEventEmpty);
     pinfo->terminated = epicsEventMustCreate(epicsEventEmpty);
-    testOk(!epicsAtExit(atExit, pinfo), "Registered atExit(%p)", pinfo);
-    testOk(!epicsAtThreadExit(atThreadExit, pinfo),
-        "Registered atThreadExit(%p)", pinfo);
+    epicsAtExit(atExit, pinfo);
+    epicsAtThreadExit(atThreadExit, pinfo);
     testDiag("%s waiting for atExit", pinfo->name);
     epicsEventMustWait(pinfo->terminate);
-}
-
-int count;
-
-static void counter(void *pvt)
-{
-    count++;
 }
 
 static void mainExit(void *pvt)
@@ -85,23 +77,16 @@ MAIN(epicsExitTest)
     info *pinfoA = (info *)calloc(1, sizeof(info));
     info *pinfoB = (info *)calloc(1, sizeof(info));
 
-    testPlan(15);
+    testPlan(7);
 
-    testOk(!epicsAtExit(counter, NULL), "Registered counter()");
-    count = 0;
-    epicsExitCallAtExits();
-    testOk(count == 1, "counter() called once");
-    epicsExitCallAtExits();
-    testOk(count == 1, "unregistered counter() not called");
-
-    testOk(!epicsAtExit(mainExit, NULL), "Registered mainExit()");
+    epicsAtExit(mainExit, NULL);
 
     epicsThreadCreate("threadA", 50, stackSize, thread, pinfoA);
     epicsThreadSleep(0.1);
     epicsThreadCreate("threadB", 50, stackSize, thread, pinfoB);
     epicsThreadSleep(1.0);
 
-    testDiag("Calling epicsExit");
+    testDiag("Calling epicsExit\n");
     epicsExit(0);
     return 0;
 }

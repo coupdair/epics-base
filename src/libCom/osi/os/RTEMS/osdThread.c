@@ -1,11 +1,15 @@
 /*************************************************************************\
 * Copyright (c) 2002 The University of Saskatchewan
-* EPICS BASE is distributed subject to a Software License Agreement found
-* in file LICENSE that is included with this distribution.
+* EPICS BASE Versions 3.13.7
+* and higher are distributed subject to a Software License Agreement found
+* in file LICENSE that is included with this distribution. 
 \*************************************************************************/
 /*
  * RTEMS osdThread.c
+ *      Revision-Id: anj@aps.anl.gov-20120618195203-fn89v5ir0faou35v
  *      Author: W. Eric Norum
+ *              eric@cls.usask.ca
+ *              (306) 966-6055
  */
 
 /*
@@ -36,9 +40,6 @@
 #include "osdInterrupt.h"
 #include "epicsExit.h"
 
-epicsShareFunc void osdThreadHooksRun(epicsThreadId id);
-epicsShareFunc void osdThreadHooksRunMain(epicsThreadId id);
-
 /*
  * Per-task variables
  */
@@ -52,23 +53,15 @@ struct taskVar {
     unsigned int        threadVariableCapacity;
     void                **threadVariables;
 };
-static struct epicsMutexOSD *taskVarMutex;
+static epicsMutexId taskVarMutex;
 static struct taskVar *taskVarHead;
 #define RTEMS_NOTEPAD_TASKVAR       11
 
 /*
  * Support for `once-only' execution
  */
-static volatile int initialized = 0; /* strictly speaking 'volatile' is not enough here, but it shouldn't hurt */
-static struct epicsMutexOSD *onceMutex;
-
-static
-void epicsMutexOsdMustLock(struct epicsMutexOSD * L)
-{
-    while(epicsMutexOsdLock(L)!=epicsMutexLockOK) {
-        cantProceed("epicsThreadOnce() mutex error");
-    }
-}
+static int initialized = 0;
+static epicsMutexId onceMutex;
 
 /*
  * Just map osi 0 to 99 into RTEMS 199 to 100
@@ -103,7 +96,7 @@ int epicsThreadGetOssPriorityValue(unsigned int osiPriority)
 /*
  * epicsThreadLowestPriorityLevelAbove ()
  */
-epicsShareFunc epicsThreadBooleanStatus epicsThreadLowestPriorityLevelAbove 
+epicsShareFunc epicsThreadBooleanStatus epicsShareAPI epicsThreadLowestPriorityLevelAbove 
             (unsigned int priority, unsigned *pPriorityJustAbove)
 {
     unsigned newPriority = priority + 1;
@@ -119,7 +112,7 @@ epicsShareFunc epicsThreadBooleanStatus epicsThreadLowestPriorityLevelAbove
 /*
  * epicsThreadHighestPriorityLevelBelow ()
  */
-epicsShareFunc epicsThreadBooleanStatus epicsThreadHighestPriorityLevelBelow 
+epicsShareFunc epicsThreadBooleanStatus epicsShareAPI epicsThreadHighestPriorityLevelBelow 
             (unsigned int priority, unsigned *pPriorityJustBelow)
 {
     unsigned newPriority = priority - 1;
@@ -154,13 +147,13 @@ epicsThreadGetStackSize (epicsThreadStackSizeClass size)
 static void
 taskVarLock (void)
 {
-    epicsMutexOsdMustLock (taskVarMutex);
+    epicsMutexLock (taskVarMutex);
 }
 
 static void
 taskVarUnlock (void)
 {
-    epicsMutexOsdUnlock (taskVarMutex);
+    epicsMutexUnlock (taskVarMutex);
 }
 
 /*
@@ -172,7 +165,6 @@ threadWrapper (rtems_task_argument arg)
 {
     struct taskVar *v = (struct taskVar *)arg;
 
-    osdThreadHooksRun((epicsThreadId)v->id);
     (*v->funptr)(v->parm);
     epicsExitCallAtThreadExits ();
     taskVarLock ();
@@ -197,8 +189,7 @@ void epicsThreadExitMain (void)
 }
 
 static void
-setThreadInfo(rtems_id tid, const char *name, EPICSTHREADFUNC funptr,
-    void *parm)
+setThreadInfo (rtems_id tid, const char *name, EPICSTHREADFUNC funptr,void *parm)
 {
     struct taskVar *v;
     uint32_t note;
@@ -223,8 +214,7 @@ setThreadInfo(rtems_id tid, const char *name, EPICSTHREADFUNC funptr,
     if (funptr) {
         sc = rtems_task_start (tid, threadWrapper, (rtems_task_argument)v);
         if (sc !=  RTEMS_SUCCESSFUL)
-            errlogPrintf ("setThreadInfo:  Can't start  %s: %s\n",
-                name, rtems_status_text(sc));
+            errlogPrintf ("setThreadInfo:  Can't start  %s: %s\n",name, rtems_status_text (sc));
     }
 }
 
@@ -242,22 +232,16 @@ epicsThreadInit (void)
         rtems_task_priority old;
 
         rtems_task_set_priority (RTEMS_SELF, epicsThreadGetOssPriorityValue(99), &old);
-        onceMutex = epicsMutexOsdCreate();
-        taskVarMutex = epicsMutexOsdCreate();
-        if (!onceMutex || !taskVarMutex)
-            cantProceed("epicsThreadInit() can't create global mutexes\n");
+        onceMutex = epicsMutexMustCreate();
+        taskVarMutex = epicsMutexMustCreate ();
         rtems_task_ident (RTEMS_SELF, 0, &tid);
         setThreadInfo (tid, "_main_", NULL, NULL);
-        osdThreadHooksRunMain((epicsThreadId)tid);
         initialized = 1;
         epicsThreadCreate ("ImsgDaemon", 99,
                 epicsThreadGetStackSize (epicsThreadStackSmall),
                 InterruptContextMessageDaemon, NULL);
     }
 }
-
-void epicsThreadRealtimeLock(void)
-{}
 
 /*
  * Create and start a new thread
@@ -273,8 +257,7 @@ epicsThreadCreate (const char *name,
 
     if (!initialized) epicsThreadInit();
     if (stackSize < RTEMS_MINIMUM_STACK_SIZE) {
-        errlogPrintf ("Warning: epicsThreadCreate %s illegal stackSize %d\n",
-            name, stackSize);
+        errlogPrintf ("Warning: epicsThreadCreate %s illegal stackSize %d\n",name,stackSize);
         stackSize = RTEMS_MINIMUM_STACK_SIZE;
     }
     strncpy (c, name, sizeof c);
@@ -285,8 +268,7 @@ epicsThreadCreate (const char *name,
          RTEMS_FLOATING_POINT|RTEMS_LOCAL,
          &tid);
     if (sc !=  RTEMS_SUCCESSFUL) {
-        errlogPrintf ("epicsThreadCreate create failure for %s: %s\n",
-            name, rtems_status_text(sc));
+        errlogPrintf ("epicsThreadCreate create failure for %s: %s\n",name, rtems_status_text (sc));
         return 0;
     }
     setThreadInfo (tid, name, funptr,parm);
@@ -298,10 +280,10 @@ threadMustCreate (const char *name,
     unsigned int priority, unsigned int stackSize,
     EPICSTHREADFUNC funptr,void *parm)
 {
-    epicsThreadId tid = epicsThreadCreate(name, priority, stackSize, funptr, parm);
+    epicsThreadId tid;
 
-    if (tid == NULL)
-        cantProceed(0);
+    if ((tid = epicsThreadCreate (name, priority, stackSize, funptr, parm)) == NULL)
+        cantProceed (0);
     return tid;
 }
 
@@ -311,9 +293,8 @@ epicsThreadSuspendSelf (void)
     rtems_status_code sc;
 
     sc = rtems_task_suspend (RTEMS_SELF);
-    if (sc != RTEMS_SUCCESSFUL)
-        errlogPrintf("epicsThreadSuspendSelf failed: %s\n",
-            rtems_status_text(sc));
+    if(sc != RTEMS_SUCCESSFUL)
+        errlogPrintf("epicsThreadSuspendSelf failed: %s\n", rtems_status_text (sc));
 }
 
 void epicsThreadResume(epicsThreadId id)
@@ -322,9 +303,8 @@ void epicsThreadResume(epicsThreadId id)
     rtems_status_code sc;
 
     sc = rtems_task_resume (tid);
-    if (sc != RTEMS_SUCCESSFUL)
-        errlogPrintf("epicsThreadResume failed: %s\n",
-            rtems_status_text (sc));
+    if(sc != RTEMS_SUCCESSFUL)
+        errlogPrintf("epicsThreadResume failed: %s\n", rtems_status_text (sc));
 }
 
 unsigned int epicsThreadGetPriority(epicsThreadId id)
@@ -335,9 +315,8 @@ unsigned int epicsThreadGetPriority(epicsThreadId id)
 
     sc = rtems_task_set_priority (tid, RTEMS_CURRENT_PRIORITY, &pri);
     if (sc != RTEMS_SUCCESSFUL)
-        errlogPrintf("epicsThreadGetPriority failed: %s\n",
-            rtems_status_text(sc));
-    return epicsThreadGetOsiPriorityValue(pri);
+        errlogPrintf("epicsThreadGetPriority failed: %s\n", rtems_status_text (sc));
+    return epicsThreadGetOsiPriorityValue (pri);
 }
 
 unsigned int epicsThreadGetPrioritySelf(void)
@@ -354,8 +333,7 @@ epicsThreadSetPriority (epicsThreadId id,unsigned int osip)
 
     sc = rtems_task_set_priority (tid, pri, &pri);
     if (sc != RTEMS_SUCCESSFUL)
-        errlogPrintf("epicsThreadSetPriority failed: %s\n",
-            rtems_status_text(sc));
+        errlogPrintf("epicsThreadSetPriority failed: %s\n", rtems_status_text (sc));
 }
 
 int
@@ -399,7 +377,7 @@ epicsThreadSleep (double seconds)
     }
     sc = rtems_task_wake_after (delay);
     if(sc != RTEMS_SUCCESSFUL)
-        errlogPrintf("epicsThreadSleep: %s\n", rtems_status_text(sc));
+        errlogPrintf("epicsThreadSleep: %s\n", rtems_status_text (sc));
 }
 
 epicsThreadId
@@ -427,6 +405,8 @@ void epicsThreadGetName (epicsThreadId id, char *name, size_t size)
     struct taskVar *v;
     int haveName = 0;
 
+    if (size <= 0)
+        return;
     taskVarLock ();
     for (v=taskVarHead ; v != NULL ; v=v->forw) {
         if (v->id == tid) {
@@ -437,9 +417,7 @@ void epicsThreadGetName (epicsThreadId id, char *name, size_t size)
     }
     taskVarUnlock ();
     if (!haveName) {
-#if (__RTEMS_MAJOR__>4 || \
-    (__RTEMS_MAJOR__==4 && __RTEMS_MINOR__>8) || \
-    (__RTEMS_MAJOR__==4 && __RTEMS_MINOR__==8 && __RTEMS_REVISION__>=99))
+#if (__RTEMS_MAJOR__>4 || (__RTEMS_MAJOR__==4 && __RTEMS_MINOR__>8) || (__RTEMS_MAJOR__==4 && __RTEMS_MINOR__==8 && __RTEMS_REVISION__>=99))
         if (_Objects_Get_name_as_string((rtems_id)id, size, name) != NULL)
             haveName = 1;
 #else
@@ -500,26 +478,26 @@ void epicsThreadOnce(epicsThreadOnceId *id, void(*func)(void *), void *arg)
     #define EPICS_THREAD_ONCE_DONE (epicsThreadId) 1
 
     if (!initialized) epicsThreadInit();
-    epicsMutexOsdMustLock(onceMutex);
+    epicsMutexMustLock(onceMutex);
     if (*id != EPICS_THREAD_ONCE_DONE) {
         if (*id == EPICS_THREAD_ONCE_INIT) { /* first call */
             *id = epicsThreadGetIdSelf();    /* mark active */
-            epicsMutexOsdUnlock(onceMutex);
+            epicsMutexUnlock(onceMutex);
             func(arg);
-            epicsMutexOsdMustLock(onceMutex);
+            epicsMutexMustLock(onceMutex);
             *id = EPICS_THREAD_ONCE_DONE;    /* mark done */
         } else if (*id == epicsThreadGetIdSelf()) {
-            epicsMutexOsdUnlock(onceMutex);
+            epicsMutexUnlock(onceMutex);
             cantProceed("Recursive epicsThreadOnce() initialization\n");
         } else
             while (*id != EPICS_THREAD_ONCE_DONE) {
                 /* Another thread is in the above func(arg) call. */
-                epicsMutexOsdUnlock(onceMutex);
+                epicsMutexUnlock(onceMutex);
                 epicsThreadSleep(epicsThreadSleepQuantum());
-                epicsMutexOsdMustLock(onceMutex);
+                epicsMutexMustLock(onceMutex);
             }
     }
-    epicsMutexOsdUnlock(onceMutex);
+    epicsMutexUnlock(onceMutex);
 }
 
 /*
@@ -553,8 +531,7 @@ void epicsThreadPrivateSet (epicsThreadPrivateId id, void *pvt)
     rtems_task_get_note (RTEMS_SELF, RTEMS_NOTEPAD_TASKVAR, &note);
     v = (struct taskVar *)note;
     if (varIndex >= v->threadVariableCapacity) {
-        v->threadVariables = realloc (v->threadVariables,
-            (varIndex + 1) * sizeof(void *));
+        v->threadVariables = realloc (v->threadVariables, (varIndex + 1) * sizeof (void *));
         if (v->threadVariables == NULL)
             cantProceed("epicsThreadPrivateSet realloc failed\n");
         for (i = v->threadVariableCapacity ; i < varIndex ; i++)
@@ -663,17 +640,19 @@ showInternalTaskInfo (rtems_id tid)
 }
 
 static void
+epicsThreadShowHeader (void)
+{
+    fprintf(epicsGetStdout(),"            PRIORITY\n");
+    fprintf(epicsGetStdout(),"    ID    EPICS RTEMS   STATE    WAIT         NAME\n");
+    fprintf(epicsGetStdout(),"+--------+-----------+--------+--------+---------------------+\n");
+}
+
+static void
 epicsThreadShowInfo (struct taskVar *v, unsigned int level)
 {
-    if (!v) {
-        fprintf(epicsGetStdout(),"            PRIORITY\n");
-        fprintf(epicsGetStdout(),"    ID    EPICS RTEMS   STATE    WAIT         NAME\n");
-        fprintf(epicsGetStdout(),"+--------+-----------+--------+--------+---------------------+\n");
-    } else {
         fprintf(epicsGetStdout(),"%9.8x", (int)v->id);
         showInternalTaskInfo (v->id);
         fprintf(epicsGetStdout()," %s\n", v->name);
-    }
 }
 
 void epicsThreadShow (epicsThreadId id, unsigned int level)
@@ -681,14 +660,13 @@ void epicsThreadShow (epicsThreadId id, unsigned int level)
     struct taskVar *v;
 
     if (!id) {
-        epicsThreadShowInfo (NULL, level);
+        epicsThreadShowHeader ();
         return;
     }
     taskVarLock ();
     for (v = taskVarHead ; v != NULL ; v = v->forw) {
         if ((rtems_id)id == v->id) {
             epicsThreadShowInfo (v, level);
-            taskVarUnlock ();
             return;
         }
     }
@@ -696,28 +674,11 @@ void epicsThreadShow (epicsThreadId id, unsigned int level)
     fprintf(epicsGetStdout(),"*** Thread %x does not exist.\n", (unsigned int)id);
 }
 
-void epicsThreadMap(EPICS_THREAD_HOOK_ROUTINE func)
-{
-    struct taskVar *v;
-
-    taskVarLock ();
-    /*
-     * Map tasks in the order of creation (backwards through list)
-     */
-    for (v = taskVarHead ; v != NULL && v->forw != NULL ; v = v->forw)
-        continue;
-    while (v) {
-        func ((epicsThreadId)v->id);
-        v = v->back;
-    }
-    taskVarUnlock ();
-}
-
 void epicsThreadShowAll (unsigned int level)
 {
     struct taskVar *v;
 
-    epicsThreadShowInfo (NULL, level);
+    epicsThreadShowHeader ();
     taskVarLock ();
     /*
      * Show tasks in the order of creation (backwards through list)
@@ -736,13 +697,4 @@ double epicsThreadSleepQuantum ( void )
     extern double rtemsTicksPerSecond_double;
 
     return 1.0 / rtemsTicksPerSecond_double;
-}
-
-epicsShareFunc int epicsThreadGetCPUs(void)
-{
-#if defined(RTEMS_SMP)
-    return rtems_smp_get_number_of_processors();
-#else
-    return 1;
-#endif
 }

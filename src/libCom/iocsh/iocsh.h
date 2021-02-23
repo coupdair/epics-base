@@ -59,19 +59,10 @@ typedef struct iocshFuncDef {
 
 typedef void (*iocshCallFunc)(const iocshArgBuf *argBuf);
 
-typedef struct iocshCmdDef {
-    iocshFuncDef const   *pFuncDef;
-    iocshCallFunc         func;
-}iocshCmdDef;
-
 epicsShareFunc void epicsShareAPI iocshRegister(
     const iocshFuncDef *piocshFuncDef, iocshCallFunc func);
 epicsShareFunc void epicsShareAPI iocshRegisterVariable (
     const iocshVarDef *piocshVarDef);
-epicsShareFunc const iocshCmdDef * epicsShareAPI iocshFindCommand(
-    const char* name);
-epicsShareFunc const iocshVarDef * epicsShareAPI iocshFindVariable(
-    const char* name);
 
 /* iocshFree frees storage used by iocshRegister*/
 /* This should only be called when iocsh is no longer needed*/
@@ -79,11 +70,6 @@ epicsShareFunc void epicsShareAPI iocshFree(void);
 
 epicsShareFunc int epicsShareAPI iocsh(const char *pathname);
 epicsShareFunc int epicsShareAPI iocshCmd(const char *cmd);
-epicsShareFunc int epicsShareAPI iocshLoad(const char *pathname, const char* macros);
-epicsShareFunc int epicsShareAPI iocshRun(const char *cmd, const char* macros);
-
-/* Makes macros that shadow environment variables work correctly with epicsEnvSet */
-epicsShareFunc void epicsShareAPI iocshEnvClear(const char *name);
 
 /* 'weak' link to pdbbase */
 epicsShareExtern struct dbBase **iocshPpdbbase;

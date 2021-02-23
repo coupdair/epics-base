@@ -5,6 +5,8 @@
 \*************************************************************************/
 
 /*
+ * Revision-Id: anj@aps.anl.gov-20110909221435-fdjubbxunee9gs44
+ *
  * Author: Eric Norum
  */
 
@@ -39,9 +41,7 @@ typedef socklen_t osiSocklen_t;
 #define SOCK_ENOBUFS ENOBUFS
 #define SOCK_ECONNRESET ECONNRESET
 #define SOCK_ETIMEDOUT ETIMEDOUT
-#define SOCK_EACCES EACCES
 #define SOCK_EADDRINUSE EADDRINUSE
-#define SOCK_EADDRNOTAVAIL EADDRNOTAVAIL
 #define SOCK_ECONNREFUSED ECONNREFUSED
 #define SOCK_ECONNABORTED ECONNABORTED
 #define SOCK_EINPROGRESS EINPROGRESS

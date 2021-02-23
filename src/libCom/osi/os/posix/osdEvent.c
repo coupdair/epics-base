@@ -1,5 +1,5 @@
 /*************************************************************************\
-* Copyright (c) 2011 UChicago Argonne LLC, as Operator of Argonne
+* Copyright (c) 2009 UChicago Argonne LLC, as Operator of Argonne
 *     National Laboratory.
 * Copyright (c) 2002 The Regents of the University of California, as
 *     Operator of Los Alamos National Laboratory.
@@ -21,138 +21,155 @@
 
 #define epicsExportSharedSymbols
 #include "epicsEvent.h"
+#include "cantProceed.h"
 #include "epicsTime.h"
 #include "errlog.h"
+#include "epicsAssert.h"
 
-struct epicsEventOSD {
-    pthread_mutex_t mutex;
-    pthread_cond_t  cond;
-    int             isFull;
-};
+/* Until these can be demonstrated to work leave them undefined*/
+#undef _POSIX_THREAD_PROCESS_SHARED
+#undef _POSIX_THREAD_PRIO_INHERIT
 
-#define printStatus(status, routine, func) \
-    errlogPrintf("%s: %s failed: %s\n", (func), (routine), strerror(status))
+typedef struct epicsEventOSD {
+    pthread_mutex_t     mutex;
+    pthread_cond_t	cond;
+    int                 isFull;
+}epicsEventOSD;
+
+#define checkStatus(status,message) \
+if((status)) { \
+    errlogPrintf("epicsEvent %s failed: error %s\n",(message),strerror((status)));}
 
-#define checkStatus(status, routine, func) \
-    if (status) { \
-        printStatus(status, routine, func); \
-    }
-
-#define checkStatusReturn(status, routine, func) \
-    if (status) { \
-        printStatus(status, routine, func); \
-        return epicsEventError; \
-    }
-
-
-epicsShareFunc epicsEventId epicsEventCreate(epicsEventInitialState init)
-{
-    epicsEventId pevent = malloc(sizeof(*pevent));
-
-    if (pevent) {
-        int status = pthread_mutex_init(&pevent->mutex, 0);
-
-        pevent->isFull = (init == epicsEventFull);
-        if (status) {
-            printStatus(status, "pthread_mutex_init", "epicsEventCreate");
-        } else {
-            status = pthread_cond_init(&pevent->cond, 0);
-            if (!status)
-                return pevent;
-            printStatus(status, "pthread_cond_init", "epicsEventCreate");
-            status = pthread_mutex_destroy(&pevent->mutex);
-            checkStatus(status, "pthread_mutex_destroy", "epicsEventCreate");
-        }
-        free(pevent);
-    }
-    return NULL;
+#define checkStatusQuit(status,message,method) \
+if(status) { \
+    errlogPrintf("epicsEvent %s failed: error %s\n",(message),strerror((status))); \
+    cantProceed((method)); \
 }
 
-epicsShareFunc void epicsEventDestroy(epicsEventId pevent)
+static int mutexLock(pthread_mutex_t *id)
 {
-    int status = pthread_mutex_destroy(&pevent->mutex);
+    int status;
 
-    checkStatus(status, "pthread_mutex_destroy", "epicsEventDestroy");
+    while(1) {
+        status = pthread_mutex_lock(id);
+        if(status!=EINTR) return status;
+        errlogPrintf("pthread_mutex_lock returned EINTR. Violates SUSv3\n");
+    }
+}
+
+static int condTimedwait(pthread_cond_t *condId, pthread_mutex_t *mutexId,
+    struct timespec *time)
+{
+    int status;
+    while(1) {
+        status = pthread_cond_timedwait(condId,mutexId,time);
+        if(status!=EINTR) return status;
+        errlogPrintf("pthread_cond_timedwait returned EINTR. Violates SUSv3\n");
+    }
+}
+
+static int condWait(pthread_cond_t *condId, pthread_mutex_t *mutexId)
+{
+    int status;
+    while(1) {
+        status = pthread_cond_wait(condId,mutexId);
+        if(status!=EINTR) return status;
+        errlogPrintf("pthread_cond_wait returned EINTR. Violates SUSv3\n");
+    }
+}
+
+epicsShareFunc epicsEventId epicsShareAPI epicsEventCreate(epicsEventInitialState initialState)
+{
+    epicsEventOSD *pevent;
+    int           status;
+
+    pevent = callocMustSucceed(1,sizeof(*pevent),"epicsEventCreate");
+    status = pthread_mutex_init(&pevent->mutex,0);
+    checkStatusQuit(status,"pthread_mutex_init","epicsEventCreate");
+    status = pthread_cond_init(&pevent->cond,0);
+    checkStatusQuit(status,"pthread_cond_init","epicsEventCreate");
+    if(initialState==epicsEventFull) pevent->isFull = 1;
+    return((epicsEventId)pevent);
+}
+
+epicsShareFunc epicsEventId epicsShareAPI epicsEventMustCreate(epicsEventInitialState initialState)
+{
+    epicsEventId id = epicsEventCreate (initialState);
+    assert (id);
+    return id;
+}
+
+epicsShareFunc void epicsShareAPI epicsEventDestroy(epicsEventId pevent)
+{
+    int   status;
+
+    status = pthread_mutex_destroy(&pevent->mutex);
+    checkStatus(status,"pthread_mutex_destroy");
     status = pthread_cond_destroy(&pevent->cond);
-    checkStatus(status, "pthread_cond_destroy", "epicsEventDestroy");
+    checkStatus(status,"pthread_cond_destroy");
     free(pevent);
 }
 
-epicsShareFunc epicsEventStatus epicsEventTrigger(epicsEventId pevent)
+epicsShareFunc void epicsShareAPI epicsEventSignal(epicsEventId pevent)
 {
-    int status = pthread_mutex_lock(&pevent->mutex);
+    int   status;
 
-    checkStatusReturn(status, "pthread_mutex_lock", "epicsEventTrigger");
-    if (!pevent->isFull) {
+    status = mutexLock(&pevent->mutex);
+    checkStatusQuit(status,"pthread_mutex_lock","epicsEventSignal");
+    if(!pevent->isFull) {
         pevent->isFull = 1;
         status = pthread_cond_signal(&pevent->cond);
-        checkStatus(status, "pthread_cond_signal", "epicsEventTrigger");
+        checkStatus(status,"pthread_cond_signal");
     }
     status = pthread_mutex_unlock(&pevent->mutex);
-    checkStatusReturn(status, "pthread_mutex_unlock", "epicsEventTrigger");
-    return epicsEventOK;
+    checkStatusQuit(status,"pthread_mutex_unlock","epicsEventSignal");
 }
-
-epicsShareFunc epicsEventStatus epicsEventWait(epicsEventId pevent)
+
+epicsShareFunc epicsEventWaitStatus epicsShareAPI epicsEventWait(epicsEventId pevent)
 {
-    epicsEventStatus result = epicsEventOK;
-    int status = pthread_mutex_lock(&pevent->mutex);
+    int   status;
 
-    checkStatusReturn(status, "pthread_mutex_lock", "epicsEventWait");
-    while (!pevent->isFull) {
-        status = pthread_cond_wait(&pevent->cond, &pevent->mutex);
-        if (status) {
-            printStatus(status, "pthread_cond_wait", "epicsEventWait");
-            result = epicsEventError;
-            goto release;
-        }
+    if(!pevent) return(epicsEventWaitError);
+    status = mutexLock(&pevent->mutex);
+    checkStatusQuit(status,"pthread_mutex_lock","epicsEventWait");
+    /*no need for while since caller must be prepared for no work*/
+    if(!pevent->isFull) {
+        status = condWait(&pevent->cond,&pevent->mutex);
+        checkStatusQuit(status,"pthread_cond_wait","epicsEventWait");
     }
     pevent->isFull = 0;
-    result = epicsEventOK;
-release:
     status = pthread_mutex_unlock(&pevent->mutex);
-    checkStatusReturn(status, "pthread_mutex_unlock", "epicsEventWait");
-    return result;
+    checkStatusQuit(status,"pthread_mutex_unlock","epicsEventWait");
+    return(epicsEventWaitOK);
 }
 
-epicsShareFunc epicsEventStatus epicsEventWaitWithTimeout(epicsEventId pevent,
-    double timeout)
+epicsShareFunc epicsEventWaitStatus epicsShareAPI epicsEventWaitWithTimeout(epicsEventId pevent, double timeout)
 {
-    epicsEventStatus result = epicsEventOK;
-    int status = pthread_mutex_lock(&pevent->mutex);
+    struct timespec wakeTime;
+    int   status = 0;
+    int   unlockStatus;
 
-    checkStatusReturn(status, "pthread_mutex_lock", "epicsEventWaitWithTimeout");
-    if (!pevent->isFull) {
-        struct timespec wakeTime;
-
-        convertDoubleToWakeTime(timeout, &wakeTime);
-        while (!status && !pevent->isFull) {
-            status = pthread_cond_timedwait(&pevent->cond, &pevent->mutex,
-                &wakeTime);
-        }
-        if (status) {
-            result = (status == ETIMEDOUT) ?
-                epicsEventWaitTimeout : epicsEventError;
-            goto release;
-        }
+    status = mutexLock(&pevent->mutex);
+    checkStatusQuit(status,"pthread_mutex_lock","epicsEventWaitWithTimeout");
+    if(!pevent->isFull) {
+        convertDoubleToWakeTime(timeout,&wakeTime);
+        status = condTimedwait(
+            &pevent->cond,&pevent->mutex,&wakeTime);
     }
-    pevent->isFull = 0;
-release:
-    status = pthread_mutex_unlock(&pevent->mutex);
-    checkStatusReturn(status, "pthread_mutex_unlock", "epicsEventWaitWithTimeout");
-    return result;
+    if(status==0) pevent->isFull = 0;
+    unlockStatus = pthread_mutex_unlock(&pevent->mutex);
+    checkStatusQuit(unlockStatus,"pthread_mutex_unlock","epicsEventWaitWithTimeout");
+    if(status==0) return(epicsEventWaitOK);
+    if(status==ETIMEDOUT) return(epicsEventWaitTimeout);
+    checkStatus(status,"pthread_cond_timedwait");
+    return(epicsEventWaitError);
 }
 
-epicsShareFunc epicsEventStatus epicsEventTryWait(epicsEventId id)
+epicsShareFunc epicsEventWaitStatus epicsShareAPI epicsEventTryWait(epicsEventId id)
 {
-    return epicsEventWaitWithTimeout(id, 0.0);
+    return(epicsEventWaitWithTimeout(id,0.0));
 }
 
-epicsShareFunc void epicsEventShow(epicsEventId pevent, unsigned int level)
+epicsShareFunc void epicsShareAPI epicsEventShow(epicsEventId id,unsigned int level)
 {
-    printf("epicsEvent %p: %s\n", pevent,
-        pevent->isFull ? "full" : "empty");
-    if (level > 0)
-        printf("    pthread_mutex = %p, pthread_cond = %p\n",
-            &pevent->mutex, &pevent->cond);
 }

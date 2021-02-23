@@ -9,6 +9,7 @@
 * in file LICENSE that is included with this distribution. 
 \*************************************************************************/
 /* devLibImpl.h */
+/*  */
 
 /*
  * Original Author: Marty Kraimer 

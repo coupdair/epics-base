@@ -9,6 +9,7 @@
 \*************************************************************************/
 /* osdMutex.c */
 /*
+ *      Revision-Id: anj@aps.anl.gov-20131120004245-drexj41vy3vynah9
  *      WIN32 version
  *
  *      Author  Jeffrey O. Hill
@@ -46,7 +47,7 @@
 #include "shareLib.h"
 #include "epicsMutex.h"
 #include "epicsAssert.h"
-#include "epicsStdio.h"
+#include "epicsStdioRedirect.h"
 
 typedef struct epicsMutexOSD { 
     union {

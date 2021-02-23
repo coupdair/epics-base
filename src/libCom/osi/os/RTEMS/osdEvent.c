@@ -1,12 +1,12 @@
 /*************************************************************************\
 * Copyright (c) 2002 The University of Saskatchewan
-* Copyright (c) 2011 UChicago Argonne LLC, as Operator of Argonne
-*     National Laboratory.
-* EPICS BASE is distributed subject to a Software License Agreement found
+* EPICS BASE Versions 3.13.7
+* and higher are distributed subject to a Software License Agreement found
 * in file LICENSE that is included with this distribution. 
 \*************************************************************************/
 /*
  * RTEMS osdEvent.c
+ *	Revision-Id: anj@aps.anl.gov-20101005192737-disfz3vs0f3fiixd
  *      Author: W. Eric Norum
  *              eric@cls.usask.ca
  *              (306) 966-6055
@@ -18,6 +18,7 @@
  */
 #define __RTEMS_VIOLATE_KERNEL_VISIBILITY__ 1
 
+#include <assert.h>
 #include <stdio.h>
 #include <rtems.h>
 #include <rtems/error.h>
@@ -83,6 +84,13 @@ epicsEventCreate(epicsEventInitialState initialState)
     return (epicsEventId)sid;
 }
 
+epicsEventId epicsEventMustCreate(epicsEventInitialState initialState)
+{
+    epicsEventId id = epicsEventCreate (initialState);
+    assert (id);
+    return id;
+}
+
 void
 epicsEventDestroy(epicsEventId id)
 {
@@ -94,20 +102,18 @@ epicsEventDestroy(epicsEventId id)
         errlogPrintf ("Can't destroy semaphore: %s\n", rtems_status_text (sc));
 }
 
-epicsEventStatus
-epicsEventTrigger(epicsEventId id)
+void
+epicsEventSignal(epicsEventId id)
 {
     rtems_id sid = (rtems_id)id;
     rtems_status_code sc;
     
     sc = rtems_semaphore_release (sid);
-    if (sc == RTEMS_SUCCESSFUL)
-        return epicsEventOK;
-    errlogPrintf ("Can't release semaphore: %s\n", rtems_status_text (sc));
-    return epicsEventError;
+    if (sc != RTEMS_SUCCESSFUL)
+        errlogPrintf ("Can't release semaphore: %s\n", rtems_status_text (sc));
 }
 
-epicsEventStatus
+epicsEventWaitStatus
 epicsEventWait(epicsEventId id)
 {
     rtems_id sid = (rtems_id)id;
@@ -116,11 +122,11 @@ epicsEventWait(epicsEventId id)
     SEMSTAT(0)
     sc = rtems_semaphore_obtain (sid, RTEMS_WAIT, RTEMS_NO_TIMEOUT);
     if (sc != RTEMS_SUCCESSFUL)
-        return epicsEventError;
-    return epicsEventOK;
+        return epicsEventWaitError;
+    return epicsEventWaitOK;
 }
 
-epicsEventStatus
+epicsEventWaitStatus
 epicsEventWaitWithTimeout(epicsEventId id, double timeOut)
 {
     rtems_id sid = (rtems_id)id;
@@ -136,14 +142,14 @@ epicsEventWaitWithTimeout(epicsEventId id, double timeOut)
         delay++;
     sc = rtems_semaphore_obtain (sid, RTEMS_WAIT, delay);
     if (sc == RTEMS_SUCCESSFUL)
-        return epicsEventOK;
+        return epicsEventWaitOK;
     else if (sc == RTEMS_TIMEOUT)
         return epicsEventWaitTimeout;
     else
-        return epicsEventError;
+        return epicsEventWaitError;
 }
 
-epicsEventStatus
+epicsEventWaitStatus
 epicsEventTryWait(epicsEventId id)
 {
     rtems_id sid = (rtems_id)id;
@@ -152,11 +158,11 @@ epicsEventTryWait(epicsEventId id)
     SEMSTAT(2)
     sc = rtems_semaphore_obtain (sid, RTEMS_NO_WAIT, RTEMS_NO_TIMEOUT);
     if (sc == RTEMS_SUCCESSFUL)
-        return epicsEventOK;
+        return epicsEventWaitOK;
     else if (sc == RTEMS_UNSATISFIED)
         return epicsEventWaitTimeout;
     else
-        return epicsEventError;
+        return epicsEventWaitError;
 }
 
 void

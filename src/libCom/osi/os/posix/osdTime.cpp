@@ -11,7 +11,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <errno.h>
 
 #include "osiSock.h"
 
@@ -37,7 +36,7 @@
         struct timezone tz;
 
         if (gettimeofday (&tv, &tz))
-            return errno;
+            return epicsTimeERROR;
 
         *pDest = epicsTime(tv);
         return epicsTimeOK;
@@ -45,7 +44,7 @@
     } // extern "C"
 #endif
 
-#ifdef __CYGWIN__
+#ifdef CYGWIN32
 int clock_settime(clockid_t clock, const timespec *tp)
 {
     return -EFAULT;
@@ -61,7 +60,7 @@ static int timeRegister(void)
 static int done = timeRegister();
 
 
-int epicsTime_gmtime ( const time_t *pAnsiTime,
+int epicsTime_gmtime ( const time_t *pAnsiTime, // X aCC 361
                        struct tm *pTM )
 {
     struct tm * pRet = gmtime_r ( pAnsiTime, pTM );
@@ -69,11 +68,11 @@ int epicsTime_gmtime ( const time_t *pAnsiTime,
         return epicsTimeOK;
     }
     else {
-        return errno;
+        return epicsTimeERROR;
     }
 }
 
-int epicsTime_localtime ( const time_t *clock,
+int epicsTime_localtime ( const time_t *clock, // X aCC 361
                           struct tm *result )
 {
     struct tm * pRet = localtime_r ( clock, result );
@@ -81,7 +80,7 @@ int epicsTime_localtime ( const time_t *clock,
         return epicsTimeOK;
     }
     else {
-        return errno;
+        return epicsTimeERROR;
     }
 }
 

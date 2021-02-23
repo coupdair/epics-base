@@ -1,5 +1,0 @@
-epicsSocketConvertErrnoToString.o: \
- ../../../src/libCom/osi/os/default/epicsSocketConvertErrnoToString.cpp \
- ../../../src/libCom/osi/osiSock.h ../../../src/libCom/misc/shareLib.h \
- ../../../src/libCom/osi/os/Linux/osdSock.h \
- ../../../src/libCom/ellLib/ellLib.h

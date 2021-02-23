@@ -11,6 +11,8 @@
 #define INC_osiPoolStatus_H
 
 /*
+ * Revision-Id: anj@aps.anl.gov-20130411175656-dor1h3zt7zo46epw
+ *
  * Author: Jeff Hill
  *
  * Functions which interrogate the state of the system wide pool

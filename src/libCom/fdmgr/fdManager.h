@@ -8,6 +8,8 @@
 * in file LICENSE that is included with this distribution. 
 \*************************************************************************/
 /*
+ *      Revision-Id: anj@aps.anl.gov-20101005192737-disfz3vs0f3fiixd
+ *
  *      File descriptor management C++ class library
  *      (for multiplexing IO in a single threaded environment)
  *
@@ -102,11 +104,11 @@ private:
     fdReg * pCBReg; 
     void reschedule ();
     double quantum ();
-    void installReg (fdReg &reg);
-    void removeReg (fdReg &reg);
+    epicsShareFunc void installReg (fdReg &reg);
+    epicsShareFunc void removeReg (fdReg &reg);
     void lazyInitTimerQueue ();
-    fdManager ( const fdManager & );
-    fdManager & operator = ( const fdManager & );
+	fdManager ( const fdManager & );
+	fdManager & operator = ( const fdManager & );
     friend class fdReg;
 };
 
@@ -120,17 +122,16 @@ epicsShareExtern fdManager fileDescriptorManager;
 //
 // file descriptor registration
 //
-class epicsShareClass fdReg :
-    public fdRegId, public tsDLNode<fdReg>, public tsSLNode<fdReg> {
+class fdReg : public fdRegId, public tsDLNode<fdReg>, public tsSLNode<fdReg> {
     friend class fdManager;
 
 public:
 
-    fdReg (const SOCKET fdIn, const fdRegType type, 
+    epicsShareFunc fdReg (const SOCKET fdIn, const fdRegType type, 
         const bool onceOnly=false, fdManager &manager = fileDescriptorManager);
-    virtual ~fdReg ();
+    epicsShareFunc virtual ~fdReg ();
 
-    virtual void show (unsigned level) const;
+    epicsShareFunc virtual void show (unsigned level) const;
     
     //
     // Called by the file descriptor manager:
@@ -141,7 +142,7 @@ public:
     //
     // fdReg::destroy() does a "delete this"
     //
-    virtual void destroy ();
+    epicsShareFunc virtual void destroy ();
 
 private:
     enum state {active, pending, limbo};
@@ -153,14 +154,14 @@ private:
     // lifetime of a fdReg object if the constructor
     // specified "onceOnly"
     //
-    virtual void callBack ()=0;
+    epicsShareFunc virtual void callBack ()=0;
 
     unsigned char state; // state enums go here
     unsigned char onceOnly;
     fdManager &manager;
 
-    fdReg ( const fdReg & );
-    fdReg & operator = ( const fdReg & );
+	fdReg ( const fdReg & );
+	fdReg & operator = ( const fdReg & );
 };
 
 //

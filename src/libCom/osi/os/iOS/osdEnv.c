@@ -6,10 +6,13 @@
 
 /* osdEnv.c */
 /*
+ * Revision-Id: anj@aps.anl.gov-20101005192737-disfz3vs0f3fiixd
+ *
  * Author: Eric Norum
  *   Date: May 7, 2001
  *
  * Routines to modify/display environment variables and EPICS parameters
+ *
  */
 
 #include <string.h>
@@ -19,21 +22,38 @@
 #include <errno.h>
 
 #define epicsExportSharedSymbols
-#include "epicsStdio.h"
+#include <epicsStdioRedirect.h>
 #include <errlog.h>
 #include <cantProceed.h>
 #include <envDefs.h>
 #include <osiUnistd.h>
 #include "epicsFindSymbol.h"
-#include <iocsh.h>
+
 
 /*
  * Set the value of an environment variable
+ * Leaks memory, but the assumption is that this routine won't be
+ * called often enough for the leak to be a problem.
  */
 epicsShareFunc void epicsShareAPI epicsEnvSet (const char *name, const char *value)
 {
-    iocshEnvClear(name);
-    setenv(name, value, 1);
+    char *cp;
+
+	cp = mallocMustSucceed (strlen (name) + strlen (value) + 2, "epicsEnvSet");
+	strcpy (cp, name);
+	strcat (cp, "=");
+	strcat (cp, value);
+	if (putenv (cp) < 0) {
+		errPrintf(
+                -1L,
+                __FILE__,
+                __LINE__,
+                "Failed to set environment parameter \"%s\" to \"%s\": %s\n",
+                name,
+                value,
+                strerror (errno));
+        free (cp);
+	}
 }
 
 /*

@@ -6,6 +6,7 @@
 # EPICS BASE is distributed subject to a Software License Agreement found
 # in the file LICENSE that is included with this distribution.
 #*************************************************************************
+# Revision-Id: anj@aps.anl.gov-20131213220401-phr67azt5xh4qgjv
 #
 # Macros and rules to create a new installation file type 
 #
@@ -58,9 +59,6 @@ INSTALL_EDL = $(INSTALL_LOCATION)/edl
 
 FILE_TYPE += PERL_MODULES
 INSTALL_PERL_MODULES = $(INSTALL_LOCATION_LIB)/perl
-
-FILE_TYPE += PKGCONFIG
-INSTALL_PKGCONFIG = $(INSTALL_LOCATION_LIB)/pkgconfig
 
 INSTALLS_CFG = $(CFG:%= $(INSTALL_CFG)/%)
 DIRECTORY_TARGETS += $(foreach type, $(FILE_TYPE),$(INSTALL_$(type)))

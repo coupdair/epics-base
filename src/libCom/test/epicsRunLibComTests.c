@@ -16,44 +16,32 @@
 #include <epicsThread.h>
 #include <epicsUnitTest.h>
 
-int blockingSockTest(void);
+int epicsThreadTest(void);
+int epicsTimerTest(void);
 int epicsAlgorithm(void);
-int epicsAtomicTest(void);
-int epicsCalcTest(void);
 int epicsEllTest(void);
 int epicsEnvTest(void);
 int epicsErrlogTest(void);
+int epicsCalcTest(void);
 int epicsEventTest(void);
-int epicsExitTest(void);
+int epicsExceptionTest(void);
 int epicsMathTest(void);
 int epicsMessageQueueTest(void);
-int epicsMMIOTest(void);
 int epicsMutexTest(void);
-int epicsSockResolveTest(void);
-int epicsSpinTest(void);
-int epicsStackTraceTest(void);
 int epicsStdioTest(void);
-int epicsStdlibTest(void);
 int epicsStringTest(void);
-int epicsThreadHooksTest(void);
 int epicsThreadOnceTest(void);
-int epicsThreadPoolTest(void);
 int epicsThreadPriorityTest(void);
 int epicsThreadPrivateTest(void);
-int epicsThreadTest(void);
-int epicsTimerTest(void);
 int epicsTimeTest(void);
-#ifdef __rtems__
-int epicsTimeZoneTest(void);
-#endif
-int epicsTypesTest(void);
-int epicsInlineTest(void);
-int ipAddrToAsciiTest(void);
-int macDefExpandTest(void);
 int macLibTest(void);
-int ringBytesTest(void);
+int macEnvExpandTest(void);
 int ringPointerTest(void);
+int ringBytesTest(void);
+int blockingSockTest(void);
+int epicsSockResolveTest(void);
 int taskwdTest(void);
+int epicsExitTest(void);
 
 void epicsRunLibComTests(void)
 {
@@ -69,52 +57,54 @@ void epicsRunLibComTests(void)
      */
     runTest(epicsTimerTest);
 
-    /*
-     * Run the regular tests in alphabetical order
-     */
-    runTest(blockingSockTest);
     runTest(epicsAlgorithm);
-    runTest(epicsAtomicTest);
-    runTest(epicsCalcTest);
+
     runTest(epicsEllTest);
+
     runTest(epicsEnvTest);
+
     runTest(epicsErrlogTest);
+
+    runTest(epicsCalcTest);
+
     runTest(epicsEventTest);
-    runTest(epicsInlineTest);
+
+    runTest(epicsExceptionTest);
+
     runTest(epicsMathTest);
+
     runTest(epicsMessageQueueTest);
-    runTest(epicsMMIOTest);
+
     runTest(epicsMutexTest);
-    runTest(epicsSockResolveTest);
-    runTest(epicsSpinTest);
-    runTest(epicsStackTraceTest);
+
     runTest(epicsStdioTest);
-    runTest(epicsStdlibTest);
+
     runTest(epicsStringTest);
-    runTest(epicsThreadHooksTest);
+
     runTest(epicsThreadOnceTest);
-    runTest(epicsThreadPoolTest);
+
     runTest(epicsThreadPriorityTest);
+
     runTest(epicsThreadPrivateTest);
+
     runTest(epicsTimeTest);
-#ifdef __rtems__
-    runTest(epicsTimeZoneTest);
-#endif
-    runTest(epicsTypesTest);
-    runTest(ipAddrToAsciiTest);
-    runTest(macDefExpandTest);
+
     runTest(macLibTest);
-    runTest(ringBytesTest);
+
+    runTest(macEnvExpandTest);
+
     runTest(ringPointerTest);
+
+    runTest(ringBytesTest);
+
+    runTest(blockingSockTest);
+    
+    runTest(epicsSockResolveTest);
+
     runTest(taskwdTest);
 
     /*
-     * Report now in case epicsExitTest dies
-     */
-    testHarnessDone();
-
-    /*
-     * epicsExitTest must come last as it never returns
+     * Exit must come last as it never returns
      */
     runTest(epicsExitTest);
 }

@@ -4,12 +4,13 @@
 # Copyright (c) 2002 The Regents of the University of California, as
 #     Operator of Los Alamos National Laboratory.
 # EPICS BASE is distributed subject to a Software License Agreement found
-# in the file LICENSE that is included with this distribution.
+# in the file LICENSE that is included with this distribution. 
 #*************************************************************************
+# Revision-Id: jba@aps.anl.gov-20121205203418-15wux5bxnojrv6pn
 #
 #	Rules for making things specified in Makefile
 #
-#	we are in O.$(T_A), but most sources are elsewhere
+#	we are in O.$(OS_CLASS), but most sources are one dir above:
 #
 
 ifndef BASE_RULES_BUILD
@@ -18,14 +19,13 @@ BASE_RULES_BUILD=1
 vpath %.c $(USR_VPATH) $(ALL_SRC_DIRS)
 vpath %.cc $(USR_VPATH) $(ALL_SRC_DIRS)
 vpath %.cpp $(USR_VPATH) $(ALL_SRC_DIRS)
+vpath %.C $(USR_VPATH) $(ALL_SRC_DIRS)
 vpath %.rc $(USR_VPATH) $(ALL_SRC_DIRS)
 vpath %.h $(USR_VPATH) $(ALL_SRC_DIRS)
-vpath %.hpp $(USR_VPATH) $(ALL_SRC_DIRS)
-vpath %.html $(USR_VPATH) $(ALL_SRC_DIRS)
+vpath %.H $(USR_VPATH) $(ALL_SRC_DIRS)
 vpath %.skel.static $(USR_VPATH) $(ALL_SRC_DIRS)
 vpath %.y $(USR_VPATH) $(ALL_SRC_DIRS)
 vpath %.l $(USR_VPATH) $(ALL_SRC_DIRS)
-vpath %.pl $(USR_VPATH) $(ALL_SRC_DIRS)
 
 #---------------------------------------------------------------
 
@@ -43,18 +43,15 @@ LOADABLE_LIBRARY += $(LOADABLE_LIBRARY_HOST)
 OBJS += $(OBJS_HOST)
 PROD += $(PROD_HOST)
 SCRIPTS += $(SCRIPTS_HOST)
-TESTLIBRARY += $(TESTLIBRARY_HOST)
 TESTSCRIPTS += $(TESTSCRIPTS_HOST)
 TESTPROD += $(TESTPROD_HOST)
 endif
 
 ifeq ($(findstring Ioc,$(VALID_BUILDS)),Ioc)
 LIBRARY += $(LIBRARY_IOC)
-LOADABLE_LIBRARY += $(LOADABLE_LIBRARY_IOC)
 OBJS += $(OBJS_IOC)
 PROD += $(PROD_IOC)
 SCRIPTS += $(SCRIPTS_IOC)
-TESTLIBRARY += $(TESTLIBRARY_IOC)
 TESTSCRIPTS += $(TESTSCRIPTS_IOC)
 TESTPROD += $(TESTPROD_IOC)
 endif
@@ -67,37 +64,25 @@ else
 INSTALL_TEMPLATES_SUBDIR = $(INSTALL_TEMPLATES)
 endif
 
-HTMLS_DIR ?= .
-
 #---------------------------------------------------------------
 #	First target
 
-all: install
-ifeq ($(EPICS_HOST_ARCH),$T_A)
-host: install
-else
-# Do nothing
-host:
-endif
-
--include $(CONFIG)/RULES_FILE_TYPE
+all:	install
 
 -include $(CONFIG)/RULES.Db
 
-#---------------------------------------------------------------
-# Include defines and rules for prod, library and test* targets
-
-#ifneq (,$(strip $(PROD) $(TESTPROD) $(LIBRARY) $(TESTLIBRARY) $(LOADABLE_LIBRARY) ))
-include $(CONFIG)/RULES_TARGET
-#endif
-
-#---------------------------------------------------------------
-# Read dependency files
+-include $(CONFIG)/RULES_JAVA
 
 ifneq (,$(strip $(HDEPENDS_FILES)))
-$(filter-out $(wildcard *$(DEP)), $(HDEPENDS_FILES)): | $(COMMON_INC)
 -include $(HDEPENDS_FILES)
 endif
+
+#---------------------------------------------------------------
+# Included defines and rules for prod,testprod, and library targets
+
+#ifneq (,$(strip $(PROD) $(TESTPROD) $(LIBRARY) $(LOADABLE_LIBRARY)))
+include $(CONFIG)/RULES_TARGET
+#endif
 
 #---------------------------------------------------------------
 #   Products and Object libraries
@@ -105,41 +90,38 @@ endif
 PRODTARGETS += $(PRODNAME) $(MUNCHNAME) $(CTDT_SRCS) $(CTDT_OBJS) $(NMS)
 
 #---------------------------------------------------------------
-#   Test specifications and test result files
+#   Generate a test specification if any tests are defined.
 #
 ifneq (,$(strip $(TESTS)))
 TARGETS += testspec
 endif
 
-# Enable testing if this host can run tests on the current target
-ifneq (,$(findstring $(T_A),$(EPICS_HOST_ARCH) $(CROSS_COMPILER_RUNTEST_ARCHS)))
-RUNTESTS_ENABLED = YES
-TAPFILES += $(TESTSCRIPTS:.t=.tap)
-JUNITFILES += $(TAPFILES:.tap=.xml)
-endif
-
 #---------------------------------------------------------------
-#   Libraries
+#   Libraries 
 #
 
-LIBTARGETS += $(LIBNAME) $(INSTALL_LIBS) $(TESTLIBNAME) \
-  $(SHRLIBNAME) $(INSTALL_SHRLIBS) $(TESTSHRLIBNAME) \
-  $(DLLSTUB_LIBNAME) $(INSTALL_DLLSTUB_LIBS) $(TESTDLLSTUB_LIBNAME) \
-  $(LOADABLE_SHRLIBNAME) $(INSTALL_LOADABLE_SHRLIBS)
+LIBTARGETS += $(LIBNAME) $(INSTALL_LIBS) \
+              $(SHRLIBNAME) $(INSTALL_SHRLIBS) \
+              $(DLL_LINK_LIBNAME) $(INSTALL_DLL_LINK_LIBS) \
+              $(LOADABLE_SHRLIBNAME) $(INSTALL_LOADABLE_SHRLIBS)
 
+$(INSTALL_LIBS): $(INSTALL_SHRLIBS)  $(INSTALL_DLL_LINK_LIBS)  $(INSTALL_LOADABLE_SHRLIBS)
+
+
+-include $(CONFIG)/RULES_FILE_TYPE
 
 #	Main targets
 
-install: buildInstall
+install: buildInstall 
 
-buildInstall: build
+buildInstall : build 
 
 # Allows rebuild to work with parallel builds option, -j.
 install: $(patsubst rebuild,clean,$(filter rebuild,$(MAKECMDGOALS)))
 
 rebuild: clean install
 
-build: inc
+build : inc 
 
 build: $(OBJSNAME) $(LIBTARGETS) $(PRODTARGETS) $(TESTPRODNAME) \
 	$(TARGETS) $(TESTSCRIPTS) $(INSTALL_LIB_INSTALLS)
@@ -155,32 +137,31 @@ buildInstall : \
 	$(INSTALL_TEMPLATE) \
 	$(INSTALL_BIN_INSTALLS)
 
-clean: build_clean
-
-build_clean:
+clean::
 	$(ECHO) "Cleaning"
-	@$(RM) *.i *$(OBJ) *.a $(TESTPRODNAME) \
-	$(LIBNAME) $(TESTLIBNAME) $(SHRLIBNAME) $(TESTSHRLIBNAME) \
-	$(DLLSTUB_LIBNAME) $(TESTDLLSTUB_LIBNAME) \
-	$(LOADABLE_SHRLIBNAME) \
-	$(INC) $(TARGETS) $(TDS) $(CLEANS) \
-	*.out MakefileInclude *.manifest *.exp \
-	$(COMMON_INC) $(HDEPENDS_FILES) $(PRODTARGETS) \
-	$(TESTSCRIPTS) $(TAPFILES) $(JUNITFILES)
+	@$(RM) *.i *$(OBJ) *.a $(TESTPRODNAME) $(LIBNAME) $(SHRLIBNAME) \
+	$(INC) $(TARGETS) $(DLL_LINK_LIBNAME) $(TDS) \
+	*.out MakefileInclude  $(LOADABLE_SHRLIBNAME) *.manifest *.exp \
+	$(COMMON_INC) $(HDEPENDS_FILES) $(PRODTARGETS) $(TESTSCRIPTS)
 ifdef RES
 	@$(RM) *$(RES)
 endif
+ifdef BAF
+	@$(RM) $(PROD_BAF) $(LIB_BAF)
+endif
+ifdef BOF
+	@$(RM) *$(BOF)
+endif
+
+# WIN95/NT source browser
+#ifdef BAF
+browse: $(LIB_BAF) $(PROD_BAF)
+#endif
 
 $(DIRECTORY_TARGETS) :
-	$(MKDIR) $@
+	$(MKDIR) -p $@
 
-# Install LIB_INSTALLS libraries before linking executables
-$(TESTPRODNAME) $(PRODNAME): | $(INSTALL_LIB_INSTALLS)
-
-# Install built libraries too, unless Makefile says to wait
-ifneq ($(DELAY_INSTALL_LIBS),YES)
-$(TESTPRODNAME) $(PRODNAME): | $(INSTALL_LIBS) $(INSTALL_DLLSTUB_LIBS)
-endif
+$(PRODNAME): $(INSTALL_LIB_INSTALLS)
 
 # RELEASE file consistency checking
 checkRelease:
@@ -189,7 +170,7 @@ warnRelease:
 	-$(CONVERTRELEASE) checkRelease
 noCheckRelease:
 ifeq ($(EPICS_HOST_ARCH),$(T_A))
-	$(info Warning: RELEASE file consistency checks have been disabled)
+	@echo "Warning: RELEASE file consistency checks have been disabled"
 endif
 
 #---------------------------------------------------------------
@@ -198,202 +179,172 @@ endif
 
 $(TESTPRODNAME) $(PRODNAME): $(PRODUCT_OBJS) $(PROD_RESS) $(PROD_DEPLIBS)
 
-$(TESTPRODNAME) $(PRODNAME): %$(EXE):
+$(TESTPRODNAME) $(PRODNAME):%$(EXE):
 	@$(RM) $@
 	$(DEBUGCMD) $(LINK.cpp)
 	$(MT_EXE_COMMAND)
+
+# object libs for R3.13 vxWorks compatibility only
+$(OBJLIBNAME): $(OBJLIB_LD_OBJS)
+
+$(OBJLIBNAME):%$(OBJ):
+	@$(RM) $@
+	$(OBJLIB_LINK.cpp)
 
 %_ctdt$(OBJ) : %_ctdt.c
 	@$(RM) $@
 	$(COMPILE.ctdt) $<
 
-%$(DEP):%.c
+%$(OBJ): %.c
+	@$(HDEPENDS_CMD)
 	@$(RM) $@
-	$(HDEPENDS.c) $<
+	$(COMPILE.c) $(call PATH_FILTER,$<) $(COMPILE_FILTER.c)
 
-%$(DEP):%.cc
+%$(OBJ): %.cc
+	@$(HDEPENDS_CMD)
 	@$(RM) $@
-	$(HDEPENDS.cpp) $<
+	$(COMPILE.cpp) $(call PATH_FILTER,$<) $(COMPILE_FILTER.cpp)
 
-%$(DEP):%.cpp
+%$(OBJ): %.cpp
+	@$(HDEPENDS_CMD)
 	@$(RM) $@
-	$(HDEPENDS.cpp) $<
+	$(COMPILE.cpp) $(call PATH_FILTER,$<) $(COMPILE_FILTER.cpp)
 
-# Cancel GNUMake's built-in rules, which don't have our _INC
-# dependencies so could get used in some circumstances (gdd)
-%.o : %.c
-%.o : %.cc
-%.o : %.cpp
-
-# Include files are order-only prerequisites for compilation:
-%$(OBJ): %.c | $(COMMON_INC) $(INSTALL_INC)
-	@$(RM) $@
-	$(COMPILE.c) -c $<
-
-%$(OBJ): %.cc | $(COMMON_INC) $(INSTALL_INC)
-	@$(RM) $@
-	$(COMPILE.cpp) -c $<
-
-%$(OBJ): %.cpp | $(COMMON_INC) $(INSTALL_INC)
-	@$(RM) $@
-	$(COMPILE.cpp) -c $<
-
-# Windows resource compiler
+# WIN95/NT resource compiler
 %$(RES): %.rc
 	@$(RM) $@
 	$(RCCMD)
 
-YACCOPT ?= $($*_YACCOPT)
+# WIN95/NT source browser
+%.bsc: %.sbr
+	$(ECHO) "building source browser archive $@"
+	@$(RM) $@
+	$(BAFCMD) $<
+
 #
 # rename the y.tab.h file only if we
 # are creating it
 #
+ifeq ($(findstring -d, $(YACCOPT)),-d)
+%.h %.c: %.y
+	$(RM) $*.c y.tab.c
+	$(RM) $*.h y.tab.h
+	$(YACC) $(YACCOPT) $<
+	$(MV) y.tab.c $*.c
+	$(MV) y.tab.h $*.h
+else
 %.c: %.y
-	@$(RM) $*.tab.c
-	@$(RM) $*.tab.h
-	$(YACC) -b$* $(YACCOPT) $<
-	$(MV) $*.tab.c $*.c
-	$(if $(findstring -d, $(YACCOPT)),$(MV) $*.tab.h $*.h,)
-
-# must be a seperate rule since when not using '-d' the
-# prefix for .h will be different then .c
-%.h : %.c %.y
+	$(RM) $*.c y.tab.c
+	$(YACC) $(YACCOPT) $<
+	$(MV) y.tab.c $*.c
+endif
 
 %.c: %.l
-	@$(RM) $*.yy.c
-	$(LEX) $(LEXOPT) -t $< > $*.yy.c
+	@$(RM) lex.yy.c
+	$(LEX) $(LEXOPT) $<
 	@$(RM) $@
-	$(MV) $*.yy.c $@
+	$(MV) lex.yy.c $@
 
-#---------------------------------------------------------------
-# Libraries, shared/DLL and stubs
+# Adl2dl rule
+%.dl : ../%.adl
+	@$(RM) $@
+	-$(ADL2DL) $< $@
 
-$(LIBNAME) $(TESTLIBNAME): $(LIBRARY_OBJS)
+# Mangen Rule:
+%.1:%
+	$(MANGEN) -s $<
+	$(MV) $(<F).nr $(<F).1
 
-$(filter-out $(DLLSTUB_LIBNAME) $(TESTDLLSTUB_LIBNAME), $(LIBNAME) $(TESTLIBNAME)): $(LIB_PREFIX)%$(LIB_SUFFIX):
+# Mangen Rule:
+%.1:../%
+	$(MANGEN) -s $<
+	$(MV) $(<F).nr $(<F).1
+
+# WIN95/NT source browser
+ifdef BAF
+
+$(LIB_BAF): $(addsuffix $(BOF),$(basename $(LIBRARY_LD_OBJS)))
+	$(ECHO) "Building source browser archive $@"
+	@$(RM) $@
+	$(BAFCMD) $^
+
+endif
+
+ifneq (,$(wildcard ../baseLIBOBJS))
+$(LIBNAME): ../baseLIBOBJS
+endif
+
+$(LIBNAME): $(LIBRARY_OBJS)
+
+$(DLL_LINK_LIBNAME): $(LIBRARY_OBJS) $(LIBRARY_RESS) $(SHRLIB_DEPLIBS) 
+
+$(LIBNAME) $(DLL_LINK_LIBNAME): $(LIB_PREFIX)%$(LIB_SUFFIX):
 	@$(RM) $@
 	$(ARCMD)
 ifneq ($(strip $(RANLIB)),)
 	$(RANLIB) $@
 endif # RANLIB
 
-$(SHRLIBNAME) $(DLLSTUB_LIBNAME) $(TESTSHRLIBNAME) $(TESTDLLSTUB_LIBNAME): \
-    $(LIBRARY_OBJS) $(LIBRARY_RESS) $(SHRLIB_DEPLIBS)
+$(SHRLIBNAME): $(LIBRARY_OBJS) $(LIBRARY_RESS) $(SHRLIB_DEPLIBS)
 
-# Stub library timestamps may be earlier than the DLL itself.
-# This order-only prerequisite resolves any related problems.
-# The $(LINK.shrlib) command must build both library files if
-# the target requires a separate stub library file.
-$(DLLSTUB_LIBNAME): | $(SHRLIBNAME);
-$(SHRLIBNAME): $(SHRLIB_PREFIX)%$(SHRLIB_SUFFIX):
+$(SHRLIBNAME):$(SHRLIB_PREFIX)%$(SHRLIB_SUFFIX):
 	@$(RM) $@
 	$(LINK.shrlib)
+ifeq ($(SHRLIB_SUFFIX),.dll)
 	$(MT_DLL_COMMAND)
-
-$(TESTDLLSTUB_LIBNAME): | $(TESTSHRLIBNAME);
-$(TESTSHRLIBNAME): $(SHRLIB_PREFIX)%$(SHRLIB_SUFFIX):
-	@$(RM) $@
-	$(LINK.shrlib)
-	$(MT_DLL_COMMAND)
+endif
 
 $(LOADABLE_SHRLIBNAME): $(LIBRARY_OBJS) $(LIBRARY_RESS) $(SHRLIB_DEPLIBS)
 
-$(LOADABLE_SHRLIBNAME): $(LOADABLE_SHRLIB_PREFIX)%$(LOADABLE_SHRLIB_SUFFIX):
+$(LOADABLE_SHRLIBNAME):$(LOADABLE_SHRLIB_PREFIX)%$(LOADABLE_SHRLIB_SUFFIX):
 	@$(RM) $@
 	$(LINK.shrlib)
 	$(MT_DLL_COMMAND)
 
-#---------------------------------------------------------------
 # C++ munching for VxWorks
-
-%.nm: %$(EXE)
+%.nm : %$(EXE)
 	@$(RM) $@
 	$(NM) $<  > $@
 
-%.nm: %$(OBJ)
+%.nm : %$(OBJ)
 	@$(RM) $@
 	$(NM) $<  > $@
 
-%_ctdt.c: %.nm $(TOOLS)/munch.pl
+%_ctdt.c : %.nm
 	@$(RM) $@
 	$(PERL) $(TOOLS)/munch.pl -o $@ $<
 
-$(MUNCHNAME): %$(MUNCH_SUFFIX): $(MUNCH_DEPENDS) %$(EXE)
+$(MUNCHNAME):%$(MUNCH_SUFFIX) : $(MUNCH_DEPENDS) %$(EXE)
 	@$(RM) $@
 	$(MUNCH_CMD)
 
-#---------------------------------------------------------------
-# GeSys modules for RTEMS
-$(MODNAME): %$(MODEXT): %$(EXE)
-	@echo "Building module $@"
+$(OBJLIB_MUNCHNAME):%.munch : %_ctdt$(OBJ) %$(OBJ)
 	@$(RM) $@
-	$(LINK.mod)
-
-#---------------------------------------------------------------
-# Automated testing
+	$(MUNCH_CMD)
 
 runtests: $(TESTSCRIPTS)
-ifdef RUNTESTS_ENABLED
 	-$(PERL) -MTest::Harness -e 'runtests @ARGV if @ARGV;' $^
-endif
 
 testspec: $(TESTSCRIPTS)
 	@$(RM) $@
 	@echo OS-class: $(OS_CLASS) > $@
 	@echo Target-arch: $(T_A) >> $@
 	$(if $^, @echo Tests: $^ >> $@)
-	$(if $(TESTFILES), @echo Files: $(TESTFILES) >> $@)
 	$(if $(TESTSPEC_$(OS_CLASS)), @echo "Harness: $(TESTSPEC_$(OS_CLASS))" >> $@)
-
-test-results: tapfiles
-ifneq ($(TAPFILES),)
-ifdef RUNTESTS_ENABLED
-	prove --failures --ext .tap --exec cat --color $(TAPFILES)
-endif
-endif
-
-clean-tests:
-ifneq ($(TAPFILES),)
-	$(RM) $(TAPFILES)
-endif
-ifneq ($(JUNITFILES),)
-	$(RM) $(JUNITFILES)
-endif
-
-tapfiles: $(TESTSCRIPTS) $(TAPFILES)
-junitfiles: $(JUNITFILES)
-
-# A .tap file is the output from running the associated test script
-%.tap: %.t
-ifdef RUNTESTS_ENABLED
-	-$(PERL) $< -tap > $@
-endif
-
-%.xml: %.tap
-	$(TAPTOJUNIT) --puretap --output $@ --input $< $*
 
 # If there's a perl test script (.plt) available, use it
 %.t: ../%.plt
 	@$(RM) $@
-	$(CP) $< $@
+	@$(CP) $< $@
 
-# Test programs (.t files) must be written in Perl.
+# Some versions of Test::Harness expect test programs in perl only.
 # Generate a perl program to exec the real test binary.
-%.t: %$(EXE) $(TOOLS)/makeTestfile.pl
+%.t: %$(EXE)
 	@$(RM) $@
-	$(PERL) $(TOOLS)/makeTestfile.pl $@ $<
+	@$(PERL) $(TOOLS)/makeTestfile.pl $@ $<
 
 #---------------------------------------------------------------
-# Generate header with version number from VCS
-
-ifneq ($(GENVERSION),)
-$(COMMON_DIR)/$(GENVERSION): FORCE
-	$(GENVERSIONHEADER) -t $(TOP) -N $(GENVERSIONMACRO) -V "$(GENVERSIONDEFAULT)" $@
-endif
-
-#---------------------------------------------------------------
-# Install rules for BIN_INSTALLS and LIB_INSTALLS
-
+## Install rules for BIN_INSTALLS and LIB_INSTALLS
 define  BIN_INSTALLS_template
 $$(INSTALL_BIN)/$$(notdir $(1)) : $(1)
 	$(ECHO) "Installing $$(<F)"
@@ -415,22 +366,20 @@ $(INSTALL_BIN)/%: ../os/$(OS_CLASS)/%
 	@$(INSTALL_PRODUCT) -d -m $(BIN_PERMISSIONS) $< $(INSTALL_BIN)
 
 $(INSTALL_BIN)/%: %
-	$(ECHO) "Installing created executable $@"
+	$(ECHO) "Installing created file $@"
 	@$(INSTALL_PRODUCT) -d -m $(BIN_PERMISSIONS) $< $(INSTALL_BIN)
 
 $(INSTALL_BIN)/%: ../%
 	$(ECHO) "Installing script $@"
 	@$(INSTALL_PRODUCT) -d -m $(BIN_PERMISSIONS) $< $(INSTALL_BIN)
 
-$(INSTALL_LIB)/%$(LIB_SUFFIX): %$(LIB_SUFFIX)
+$(INSTALL_LIB)/%.a: %.a
 	$(ECHO) "Installing library $@"
 	@$(INSTALL_LIBRARY) -d -m $(LIB_PERMISSIONS) $< $(INSTALL_LIB)
 
-ifneq ($(LIB_SUFFIX),$(DLLSTUB_SUFFIX))
-$(INSTALL_LIB)/%$(DLLSTUB_SUFFIX): %$(DLLSTUB_SUFFIX)
-	$(ECHO) "Installing DLL stub library $@"
+$(INSTALL_LIB)/%.lib: %.lib
+	$(ECHO) "Installing library $@"
 	@$(INSTALL_LIBRARY) -d -m $(LIB_PERMISSIONS) $< $(INSTALL_LIB)
-endif # SUFFIX
 
 $(INSTALL_SHRLIBS): $(INSTALL_SHRLIB)/%: %
 	$(ECHO) "Installing shared library $@"
@@ -458,7 +407,7 @@ $(INSTALL_TCLLIB)/$(TCLINDEX): $(INSTALL_TCLLIBS)
 
 $(INSTALL_LOADABLE_SHRLIBS): $(INSTALL_SHRLIB)/%: %
 	$(ECHO) "Installing loadable shared library $@"
-	@$(INSTALL_LIBRARY) -d -m $(SHRLIB_PERMISSIONS) $< $(INSTALL_SHRLIB)
+	@$(INSTALL_LIBRARY) -d -m 555 $< $(INSTALL_SHRLIB)
 ifneq ($(LOADABLE_SHRLIB_SUFFIX),$(SHRLIB_SUFFIX_BASE))
 ifneq (,$(strip $(LOADABLE_SHRLIB_VERSION)))
 	@$(RM) $(subst $(LOADABLE_SHRLIB_SUFFIX),$(SHRLIB_SUFFIX_BASE),$@)
@@ -483,11 +432,7 @@ $(INSTALL_INCLUDE)/% : %
 	@$(INSTALL) -d -m $(INSTALL_PERMISSIONS) $< $(@D)
 
 $(INSTALL_INCLUDE)/os/$(OS_CLASS)/% : %
-	$(ECHO) "Installing OS dependent include file $@"
-	@$(INSTALL) -d -m $(INSTALL_PERMISSIONS) $< $(@D)
-
-$(INSTALL_INCLUDE)/compiler/$(CMPLR_CLASS)/% : %
-	$(ECHO) "Installing compiler dependent include file $@"
+	$(ECHO) "Installing os dependent include file $@"
 	@$(INSTALL) -d -m $(INSTALL_PERMISSIONS) $< $(@D)
 
 $(INSTALL_DOC)/%: %
@@ -506,10 +451,6 @@ $(INSTALL_HTML)/$(HTMLS_DIR)/%: ../%
 	$(ECHO) "Installing html $@"
 	@$(INSTALL) -d -m $(INSTALL_PERMISSIONS) $< $(@D)
 
-$(INSTALL_HTML)/$(HTMLS_DIR)/%: $(COMMON_DIR)/%
-	$(ECHO) "Installing generated html $@"
-	@$(INSTALL) -d -m $(INSTALL_PERMISSIONS) $< $(@D)
-
 $(INSTALL_TEMPLATES_SUBDIR)/%: ../%
 	$(ECHO) "Installing $@"
 	@$(INSTALL) -d -m $(INSTALL_PERMISSIONS) $< $(@D)
@@ -523,9 +464,8 @@ $(INSTALL_TEMPLATES_SUBDIR)/%: %
 .PRECIOUS: %.i %.o %.c %.nm %.cpp %.cc
 .PRECIOUS: $(COMMON_INC)
 
-.PHONY: all host inc build install clean rebuild buildInstall build_clean
-.PHONY: runtests tapfiles clean-tests test-results junitfiles
-.PHONY: checkRelease warnRelease noCheckRelease FORCE
+.PHONY: all inc build install clean rebuild buildInstall
+.PHONY: runtests checkRelease warnRelease noCheckRelease
 
 endif # BASE_RULES_BUILD
 #	EOF RULES_BUILD
