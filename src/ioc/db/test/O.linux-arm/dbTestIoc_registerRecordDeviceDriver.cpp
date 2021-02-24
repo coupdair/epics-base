@@ -61,7 +61,7 @@ static struct jlif *jlifsl[] = {
 int dbTestIoc_registerRecordDeviceDriver(DBBASE *pbase)
 {
     static int executed = 0;
-    const char *bldTop = "/media/data/home/rp/code/EPICS/base-3.16.1";
+    const char *bldTop = "/media/data/home/rp/code/EPICS/base";
     const char *envTop = getenv("TOP");
 
     if (envTop && strcmp(envTop, bldTop)) {
